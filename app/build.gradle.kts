@@ -97,15 +97,16 @@ android {
         )
     }
 
-    // Phase 6 — Compose Compiler Reports on `release` only. Dev
-    // builds skip the post-compile metrics pass for speed.
-    val enableComposeCompilerReports = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+    // Phase 6 — Compose Compiler Reports. Active on `release` or when requested
+    // on debug via `./gradlew :app:compileDebugKotlin -PcomposeReports=true`.
+    val enableComposeCompilerReports = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) } ||
+        project.hasProperty("composeReports")
     if (enableComposeCompilerReports) {
         kotlinOptions {
             freeCompilerArgs += listOf(
                 "-P",
                 "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=" +
-                    project.buildDir.absolutePath + "/compose_compiler"
+                    project.layout.buildDirectory.get().asFile.absolutePath + "/compose_compiler"
             )
         }
     }
@@ -167,7 +168,6 @@ dependencies {
     implementation(project(":billing"))
     implementation(project(":storage"))
 
-    // Phase 6 — baselineprofile project available to macrobenchmark
-    // tasks but kept out of the runtime classpath.
-    baselineProfile(project(":baselineprofile"))
+    // Performance
+    implementation("androidx.metrics:metrics-performance:1.0.0-beta01")
 }
