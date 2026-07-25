@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "schema": "mbeat-v1",
+  "projectId": "sample",
+  "name": "Warehouse Groove",
+  "bpm": 120,
+  "swing": 0.0,
+  "tracks": [
+    {
+      "id": "kick",
+      "steps": [0, 4, 8, 12]
+    },
+    {
+      "id": "snare",
+      "steps": [4, 12]
+    },
+    {
+      "id": "hat",
+      "steps": [0, 2, 4, 6, 8, 10, 12, 14]
+    }
+  ]
+}
