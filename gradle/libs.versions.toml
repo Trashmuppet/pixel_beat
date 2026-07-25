@@ -20,7 +20,18 @@ coreKtx = "1.15.0"
 playBilling = "7.1.1"
 
 # Room (rebuildable recent-projects cache per docs/14_STORAGE.md)
-room = "2.6.1"
+#
+# Room 2.7+ adds first-class KSP2 support, which is the default KSP
+# implementation under Kotlin 2.0.21. Room 2.6.x is KSP1-only and
+# fails annotation processing on `@Database` with `[MissingType]:
+# Element StorageDatabase references a type that is not present`.
+room = "2.7.2"
+
+# SQLite framework. Required by `MigrationTestHelper` /
+# `FrameworkSQLiteOpenHelperFactory` in
+# `storage/src/test/.../StorageDatabaseMigrationTest.kt`. Pinned to
+# the Room 2.7.x release line.
+sqlite = "2.4.0"
 
 # Test scaffolding (Phase 6 close-out: MigrationTestHelper on Robolectric)
 robolectric = "4.13"
@@ -59,6 +70,10 @@ androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
+
+# SQLite framework — `androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory`
+# for `MigrationTestHelper` in Robolectric test.
+androidx-sqlite-framework = { module = "androidx.sqlite:sqlite-framework", version.ref = "sqlite" }
 
 # Test scaffolding — Robolectric + AndroidJUnit4 for Room MigrationTestHelper
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
