@@ -191,7 +191,7 @@ fun Playhead(
                 .fillMaxWidth(widthPerStep)
                 .height(4.dp)
                 .background(MonoPalette.Foreground)
-                .padding(start = safeIndex * widthPerStep.toFloat().coerceAtLeast(1f).dp)
+                .padding(start = (safeIndex * widthPerStep.toFloat().coerceAtLeast(1f)).dp)
         )
     }
 }
