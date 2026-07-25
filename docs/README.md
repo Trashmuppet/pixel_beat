@@ -71,19 +71,19 @@ module diagram and per-module responsibilities.
 Each Architectural Decision Record documents one rule that's
 otherwise implicit. Locked today:
 
-- [ADR-001](./adr/001-timeline-authoritative.md) — Timeline Compilation Authoritative
-- [ADR-002](./adr/002-native-engine-isolation.md) — Native Engine Isolation
-- [ADR-003](./adr/003-mvvm-unidirectional-data-flow.md) — MVVM Unidirectional Data Flow
-- [ADR-004](./adr/004-fixed-timestep-240hz.md) — Fixed-timestep 240Hz Scene Simulation
-- [ADR-005](./adr/005-export-renderer-is-reference.md) — Offline Renderer Is The Reference
-- [ADR-006](./adr/006-release-discipline-gates.md) — Release Discipline Gates
-- Template: [`adr/000-template.md`](./adr/000-template.md)
+- [ADR-001](../adr/001-timeline-authoritative.md) — Timeline Compilation Authoritative
+- [ADR-002](../adr/002-native-engine-isolation.md) — Native Engine Isolation
+- [ADR-003](../adr/003-mvvm-unidirectional-data-flow.md) — MVVM Unidirectional Data Flow
+- [ADR-004](../adr/004-fixed-timestep-240hz.md) — Fixed-timestep 240Hz Scene Simulation
+- [ADR-005](../adr/005-export-renderer-is-reference.md) — Offline Renderer Is The Reference
+- [ADR-006](../adr/006-release-discipline-gates.md) — Release Discipline Gates
+- Template: [`adr/000-template.md`](../adr/000-template.md)
 
 ---
 
 ## Build
 
-Versions pinned in [`gradle/libs.versions.toml`](./gradle/libs.versions.toml):
+Versions pinned in [`gradle/libs.versions.toml`](../gradle/libs.versions.toml):
 
 - Android Gradle Plugin **8.7.3**
 - Kotlin **2.0.21**
@@ -132,7 +132,7 @@ shipping.
 1. **Copy** `app/keystore.properties.example` to
    `app/keystore.properties` and fill in the `storePassword`,
    `keyPassword`. The file itself stays gitignored — see
-   [`.gitignore`](./.gitignore).
+   [`.gitignore`](../.gitignore).
 2. **Place** `release.keystore` next to `app/`.
 3. **Run** `./gradlew :app:assembleRelease`. R8 + AAB splits fire
    automatically; the upload-key signature is taken from
@@ -179,5 +179,5 @@ byte-identical MP4) are tracked in `/adr/` as their work begins.
 The `00_*` through `18_*` markdown specs at the repository root are
 the authoritative product/architecture source of truth. This
 scaffolding honours every frozen rule in them; new code lands
-behind [architectural decision records](./adr/) so changes to
+behind [architectural decision records](../adr/) so changes to
 those rules stay explicit.

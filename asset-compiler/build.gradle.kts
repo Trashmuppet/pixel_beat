@@ -24,11 +24,20 @@ kotlin {
 }
 
 application {
-    mainClass.set("com.trashmuppet.pixelbeat.assetcompiler.AssetCompilerKt")
+    mainClass.set("com.trashmuppet.pixelbeat.assetcompiler.MainKt")
 }
 
 dependencies {
     implementation(project(":core:common"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
+
+    testImplementation(platform("org.junit:junit-bom:5.10.2"))
+    testImplementation("org.junit.jupiter:junit-jupiter-api")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+    testImplementation(kotlin("test"))
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
 }

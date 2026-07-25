@@ -9,7 +9,7 @@
 
 ## Context
 
-[`03_BUILD_SEQUENCE.md`](../03_BUILD_SEQUENCE.md) Phase 6 demands
+[`03_BUILD_SEQUENCE.md`](../docs/03_BUILD_SEQUENCE.md) Phase 6 demands
 "performance budgets met, tests passing, documentation updated,
 ADR created for architectural changes." We've shipped projects
 where the CI surface drifted — a missing R8 rule for kotlinx.serialization

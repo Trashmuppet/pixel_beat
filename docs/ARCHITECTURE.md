@@ -3,7 +3,7 @@
 > Phase 6 docs pass — top-level companion to the design specs at the
 > repo root. This file replaces years of stale `ARCHITECTURE.md` and
 > consolidates what `04_REPOSITORY_STRUCTURE.md`, `05_TECH_STACK.md`
-> and the ADRs in [`/adr/`](./adr/) say in one place.
+> and the ADRs in [`/adr/`](../adr/) say in one place.
 
 ---
 
@@ -130,17 +130,17 @@ the Android app layer so artists can compile packs offline.
 ## Architectural decisions
 
 The freeze of architectural decisions lives in
-[`/adr/`](./adr/) (ADR-001 through ADR-006). Each decision covers a
+[`/adr/`](../adr/) (ADR-001 through ADR-006). Each decision covers a
 single architectural rule that would otherwise be implicit.
 
 | ADR | Title | Owns |
 |---|---|---|
-| [ADR-001](./adr/001-timeline-authoritative.md) | Timeline Compilation Authoritative | UI never owns musical time |
-| [ADR-002](./adr/002-native-engine-isolation.md) | Native Engine Isolation | audio-native is engine-only |
-| [ADR-003](./adr/003-mvvm-unidirectional-data-flow.md) | MVVM Unidirectional Data Flow | StateFlow + Repository pattern |
-| [ADR-004](./adr/004-fixed-timestep-240hz.md) | Fixed-timestep 240Hz Scene | scene never drives musical time |
-| [ADR-005](./adr/005-export-renderer-is-reference.md) | Offline Renderer Is The Reference | identical input ⇒ identical output (byte for WAV/GIF) |
-| [ADR-006](./adr/006-release-discipline-gates.md) | Release Discipline Gates | keystore / R8 / AAB / CI |
+| [ADR-001](../adr/001-timeline-authoritative.md) | Timeline Compilation Authoritative | UI never owns musical time |
+| [ADR-002](../adr/002-native-engine-isolation.md) | Native Engine Isolation | audio-native is engine-only |
+| [ADR-003](../adr/003-mvvm-unidirectional-data-flow.md) | MVVM Unidirectional Data Flow | StateFlow + Repository pattern |
+| [ADR-004](../adr/004-fixed-timestep-240hz.md) | Fixed-timestep 240Hz Scene | scene never drives musical time |
+| [ADR-005](../adr/005-export-renderer-is-reference.md) | Offline Renderer Is The Reference | identical input ⇒ identical output (byte for WAV/GIF) |
+| [ADR-006](../adr/006-release-discipline-gates.md) | Release Discipline Gates | keystore / R8 / AAB / CI |
 
 ## Cross-cutting principles
 

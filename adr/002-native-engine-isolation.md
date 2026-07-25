@@ -9,7 +9,7 @@
 
 ## Context
 
-[`08_AUDIO_ENGINE.md`](../08_AUDIO_ENGINE.md) requires the audio
+[`08_AUDIO_ENGINE.md`](../docs/08_AUDIO_ENGINE.md) requires the audio
 callback to be allocation-free and lock-free. The native module
 sits at the bottom of the architecture but historically leaked UI /
 storage dependencies into the JNI thread through shared globals and
