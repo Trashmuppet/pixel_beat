@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.io.File
 import java.security.MessageDigest
 
 /**
@@ -61,6 +62,25 @@ class SceneRuntimeTest {
         // At minimum, the framebuffer must contain at least one lit pixel.
         val anyWhitePixel = state.pixels.any { byte -> (0..7).any { bit -> ((byte.toInt() ushr (7 - bit)) and 1) == 1 } }
         assertTrue(anyWhitePixel, "after a kick hit, warehouse scene should show at least one lit pixel")
+    }
+
+    @Test
+    fun `sha256 of fixture matches golden file`() {
+        val project = fixture()
+        val state = render(project)
+        val actual = sha256Hex(state.pixels)
+        // Resolve golden resource from the test classpath.
+        val resource = javaClass.classLoader.getResource("golden/warehouse-1sec-sha256.txt")
+            ?: error("Golden file missing — run sha256_of_fixture_is_stable test first on a real device")
+        val expected = File(resource.toURI()).readText().lines()
+            .firstOrNull { it.isNotBlank() && !it.startsWith("#") }
+            ?.trim() ?: error("Golden file has no hash value")
+        if (expected == "REPLACE_WITH_CI_HASH") {
+            println("golden-warehouse-1sec-sha256=$actual")
+            println("Replace REPLACE_WITH_CI_HASH in golden/warehouse-1sec-sha256.txt with the value above.")
+            return // Skip assertion — CI run hasn't populated the golden yet.
+        }
+        assertEquals(expected, actual, "Golden SHA-256 mismatch — CI hardware has changed")
     }
 
     @Test

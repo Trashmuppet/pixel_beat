@@ -1,0 +1,5 @@
+# Golden SHA-256 hash for WarehouseScene 1-second fixture.
+# Run SceneRuntimeTest.sha256 of fixture is stable across runs on a
+# real device/emulator to get the actual hash, then replace this line
+# with the hex value. The test will fail until this is populated.
+REPLACE_WITH_CI_HASH

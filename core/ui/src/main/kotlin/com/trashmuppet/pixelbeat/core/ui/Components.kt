@@ -32,8 +32,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -72,7 +75,10 @@ fun StepCell(
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onToggle()
             }
-            .semantics { contentDescription = if (active) "Active step" else "Inactive step" }
+            .semantics {
+                contentDescription = if (active) "Active step" else "Inactive step"
+                role = Role.Checkbox
+            }
     )
 }
 
@@ -108,7 +114,10 @@ fun TrackHeader(
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onMuteToggle()
                 }
-                .semantics { contentDescription = if (muted) "Unmute track" else "Mute track" }
+                .semantics {
+                    contentDescription = if (muted) "Unmute track" else "Mute track"
+                    role = Role.Switch
+                }
         )
     }
 }
@@ -205,7 +214,10 @@ fun TempoControl(
             modifier = Modifier
                 .fillMaxWidth()
                 .sizeIn(minHeight = TapTarget)
-                .semantics { contentDescription = "Tempo in beats per minute" }
+                .semantics {
+                    contentDescription = "Tempo in beats per minute"
+                    stateDescription = "${bpm.toInt()} bpm"
+                }
         )
     }
 }
@@ -254,7 +266,10 @@ fun SwingControl(
             modifier = Modifier
                 .fillMaxWidth()
                 .sizeIn(minHeight = TapTarget)
-                .semantics { contentDescription = "Swing amount" }
+                .semantics {
+                    contentDescription = "Swing amount"
+                    stateDescription = "Swing ${(swing.amount * 100).toInt()} percent"
+                }
         )
         Text(
             "Amount: ${(swing.amount * 100).toInt()}%",
