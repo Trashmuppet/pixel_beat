@@ -40,6 +40,22 @@ android {
     }
 }
 
+// Phase 6 close-out (round 11 fix): pin the Kotlin JVM toolchain
+// explicitly so KSP receives a populated `jdkHome` argument. Without
+// this, the Kotlin compiler is invoked with `jdkHome = null` and KSP
+// cannot resolve `java.*` / standard library types during AST
+// construction. Room's `@Database` annotation processor then fails
+// with `[MissingType]: Element StorageDatabase references a type
+// that is not present`. The same corrupted-state failure mode also
+// produces garbage "Unclosed comment" lines with impossible line
+// numbers in unrelated files (KSP's error reporter operating in a
+// degraded mode). Pinning the toolchain to 17 matches the
+// `compileOptions` / `kotlinOptions.jvmTarget` configuration and
+// makes the JDK visible to KSP.
+kotlin {
+    jvmToolchain(17)
+}
+
 ksp {
     // Phase 6+: emit `1.json` + `2.json` schema snapshots so
     // `MigrationTestHelper` in `StorageDatabaseMigrationTest` can
