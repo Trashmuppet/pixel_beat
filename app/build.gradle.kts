@@ -170,4 +170,8 @@ dependencies {
 
     // Performance
     implementation("androidx.metrics:metrics-performance:1.0.0-beta01")
+
+    // Phase 6 — baselineprofile project available to macrobenchmark
+    // tasks but kept out of the runtime classpath.
+    baselineProfile(project(":baselineprofile"))
 }
