@@ -39,6 +39,9 @@ include(":core:model")
 include(":core:timeline")
 include(":core:common")
 
+// Cross-cutting reusable Compose components (Phase 3).
+include(":core:ui")
+
 // Native C++ audio engine (real-time only — no UI / storage access)
 include(":audio-native")
 
@@ -46,6 +49,15 @@ include(":audio-native")
 include(":scene-api")
 include(":scene-runtime")
 include(":scene-warehouse")
+
+// Phase 5 export pipeline (WAV / GIF / MP4 media encoders)
+include(":core:export")
+include(":testing")
+include(":premium")
+include(":billing")
+
+// Phase 6 macrobenchmark + BaselineProfile scaffolding
+include(":baselineprofile")
 
 // User-visible features
 include(":feature-home")

@@ -3,33 +3,52 @@ package com.trashmuppet.pixelbeat.core.model
 import kotlinx.serialization.Serializable
 
 /**
- * The authoritative project document for Monochrome Beat.
+ * Authoritative project document for Monochrome Beat — schema v2.
  *
- * Per `14_STORAGE.md` this is the **source of truth**. Room and any other
- * cache layer are rebuildable from this document; the document is never
- * derived from them.
+ * Per `14_STORAGE.md` this is the source of truth. Phase 1 locked the
+ * schema for the rhythmic + arrangement surface; rendering / export
+ * schemas stay downstream.
  *
- * Persisted as versioned UTF-8 JSON (.mbeat). Bumping `schema` requires a
- * defined migration per `14_STORAGE.md` ("Explicit migrations").
+ * Schema values align with `core/timeline/.../TimelineCompiler.kt`.
  */
 @Serializable
 data class MBeatProject(
-    val version: Int = MBEAT_CURRENT_VERSION,
-    val schema: String = MBEAT_SCHEMA,
-    val projectId: String,
+    val id: String,
     val name: String,
-    val bpm: Int,
-    val swing: Double = 0.0,
-    val tracks: List<Track>
+    val bpm: Float,
+    val seed: ProjectSeed,
+    val swing: SwingMode,
+    val arrangement: Arrangement,
+    val patterns: List<Pattern>,
+    val version: Int = MBEAT_CURRENT_VERSION,
+    val schema: String = MBEAT_SCHEMA
 ) {
+    init {
+        require(bpm in MIN_BPM..MAX_BPM) { "bpm $bpm outside [$MIN_BPM,$MAX_BPM]" }
+        require(patterns.isNotEmpty()) { "project must have at least one pattern" }
+        require(arrangement.patternChain.isNotEmpty()) { "arrangement.patternChain cannot be empty" }
+    }
+
     companion object {
-        const val MBEAT_CURRENT_VERSION = 1
-        const val MBEAT_SCHEMA = "mbeat-v1"
+        const val MBEAT_CURRENT_VERSION = 2
+        const val MBEAT_SCHEMA = "mbeat-v2"
+        const val MIN_BPM = 30f
+        const val MAX_BPM = 300f
     }
 }
 
+/**
+ * One section of a song. Patterns repeat at the same `lengthSteps` so
+ * arrangement chaining is simple per-bar accounting.
+ */
 @Serializable
-data class Track(
+data class Pattern(
     val id: String,
-    val steps: List<Int>
-)
+    val lengthSteps: Int = 16,
+    val tracks: List<Track>
+) {
+    init {
+        require(lengthSteps in 1..64) { "lengthSteps $lengthSteps outside [1,64]" }
+        require(tracks.isNotEmpty()) { "pattern must have at least one track" }
+    }
+}

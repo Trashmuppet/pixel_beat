@@ -48,4 +48,16 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.ui.graphics)
     debugImplementation(libs.compose.ui.tooling)
+
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
+    testImplementation("org.jetbrains.kotlin:kotlin-test:2.0.21")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.3")
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "failed", "skipped")
+        showStandardStreams = false
+    }
 }

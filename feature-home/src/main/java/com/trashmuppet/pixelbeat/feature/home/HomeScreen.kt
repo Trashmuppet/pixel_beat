@@ -1,8 +1,14 @@
 package com.trashmuppet.pixelbeat.feature.home
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.Button
@@ -11,48 +17,118 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
+import com.trashmuppet.pixelbeat.core.model.MBeatProject
+import com.trashmuppet.pixelbeat.core.ui.ExportProgressBar
+import com.trashmuppet.pixelbeat.core.ui.MonoPalette
+import com.trashmuppet.pixelbeat.core.ui.ProGate
+import com.trashmuppet.pixelbeat.core.ui.ProjectCard
+import com.trashmuppet.pixelbeat.core.ui.TapTarget
+import com.trashmuppet.pixelbeat.scene.api.ScenePack
 
 /**
- * Home destination.
- *
- * Phase 0 ships two affordances: "Create" (primary) and "Open" (secondary).
- * Both honour the UI Bible's 48dp minimum touch target.
+ * Home destination — two primary affordances per `16_UI_BIBLE.md`
+ * (Create / Open). Recent projects listed under "Open" so the user
+ * can resume work without re-creating a beat.
  */
 @Composable
 fun HomeScreen(
+    recent: List<MBeatProject> = emptyList(),
+    scenePacks: List<ScenePack> = emptyList(),
+    isPro: Boolean = false,
     onNewProject: () -> Unit,
-    onOpenProject: () -> Unit
+    onOpenProject: () -> Unit,
+    onProjectSelected: (MBeatProject) -> Unit = {},
+    onUnlockPro: () -> Unit = {}
 ) {
+    val haptic = LocalHapticFeedback.current
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp).semantics { testTag = "route/home" },
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "Monochrome Beat",
-            color = Color.White
+            color = MonoPalette.Foreground,
+            fontSize = 24.sp
+        )
+        Text(
+            text = "Create a beat. Watch it come alive.",
+            color = MonoPalette.Foreground,
+            fontSize = 14.sp
         )
 
         Button(
-            onClick = onNewProject,
-            modifier = Modifier.sizeIn(minHeight = 48.dp),
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onNewProject()
+            },
+            modifier = Modifier.sizeIn(minHeight = TapTarget),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color.White,
-                contentColor = Color.Black
+                containerColor = MonoPalette.Foreground,
+                contentColor = MonoPalette.Background
             )
         ) { Text("Create Project") }
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text("Recent", color = MonoPalette.Foreground, fontSize = 14.sp)
+
         Button(
-            onClick = onOpenProject,
-            modifier = Modifier.sizeIn(minHeight = 48.dp),
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onOpenProject()
+            },
+            modifier = Modifier.sizeIn(minHeight = TapTarget),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Black,
-                contentColor = Color.White
+                containerColor = MonoPalette.Background,
+                contentColor = MonoPalette.Foreground
             )
-        ) { Text("Open Project") }
+        ) { Text("Browse All") }
+
+        recent.take(3).forEach { project ->
+            ProjectCard(
+                project = project,
+                onClick = { onProjectSelected(project) },
+                onLongPress = { /* delete later */ }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("Scene Packs", color = MonoPalette.Foreground, fontSize = 14.sp)
+
+        scenePacks.forEach { pack ->
+            ProGate(
+                requiresPro = pack.requiresPro,
+                isPro = isPro,
+                onUnlockClick = onUnlockPro,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .sizeIn(minHeight = TapTarget)
+                        .border(width = 1.dp, color = MonoPalette.Foreground)
+                        .background(MonoPalette.Background)
+                        .padding(16.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(pack.displayName, color = MonoPalette.Foreground)
+                        Text(pack.description, color = MonoPalette.Foreground, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Keep the export progress bar import path live so
+        // children of HomeScreen never silently drop the symbol.
+        ExportProgressBar(progress = 0f, statusLine = "")
     }
 }

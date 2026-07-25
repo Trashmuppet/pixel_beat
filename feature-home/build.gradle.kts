@@ -26,6 +26,7 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
+    implementation(project(":core:ui"))
     implementation(project(":premium"))
 
     val composeBom = platform(libs.compose.bom)

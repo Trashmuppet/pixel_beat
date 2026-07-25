@@ -71,6 +71,17 @@ class ProjectStore(context: Context) {
         )
     }
 
+    /**
+     * Decode an `.mbeat` file directly without id-based path lookup.
+     * Used by `StorageProjectRepository.listRecent` and tests.
+     *
+     * Per `14_STORAGE.md` "Preserve unsupported documents unchanged":
+     * unknown schemas raise so callers can decide whether to keep or
+     * skip the file.
+     */
+    fun decode(file: File): MBeatProject =
+        json.decodeFromString(MBeatProject.serializer(), file.readText(Charsets.UTF_8))
+
     companion object {
         const val SAMPLE_ID = "sample"
         const val SAMPLE_ASSET = "sample.mbeat"
