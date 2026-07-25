@@ -29,4 +29,16 @@ interface PremiumManager {
      *  4. Fall back to the cached value on network / service errors.
      */
     suspend fun refreshEntitlement()
+
+    /**
+     * Launch the system purchase UI for the Pro Unlock.
+     *
+     * [activity] is the hosting Android Activity, passed as [Any] so
+     * this interface stays pure-Kotlin (no Android dependency).
+     * Implementations cast it to the required platform type.
+     *
+     * On success the implementation updates [entitlementState] to
+     * [PremiumState.Pro] via [PurchasesUpdatedListener].
+     */
+    suspend fun launchPurchaseFlow(activity: Any)
 }

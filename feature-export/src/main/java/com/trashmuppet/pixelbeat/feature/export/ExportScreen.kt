@@ -16,10 +16,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import android.app.Activity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
@@ -31,6 +33,7 @@ import com.trashmuppet.pixelbeat.core.ui.ExportProgressBar
 import com.trashmuppet.pixelbeat.core.ui.MonoPalette
 import com.trashmuppet.pixelbeat.core.ui.TapTarget
 import com.trashmuppet.pixelbeat.premium.PremiumState
+import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
@@ -87,6 +90,19 @@ fun ExportScreen(
                             color = MonoPalette.Foreground,
                             fontSize = 11.sp
                         )
+                        val scope = rememberCoroutineScope()
+                        Button(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                val activity = context as? Activity ?: return@Button
+                                scope.launch { viewModel.premiumManager.launchPurchaseFlow(activity) }
+                            },
+                            modifier = Modifier.sizeIn(minHeight = TapTarget),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MonoPalette.Foreground,
+                                contentColor = MonoPalette.Background
+                            )
+                        ) { Text("Unlock Pro") }
                     }
                 }
                 Button(
