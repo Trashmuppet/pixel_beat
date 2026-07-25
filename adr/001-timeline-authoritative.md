@@ -9,7 +9,7 @@
 
 ## Context
 
-[`07_TIMELINE_ENGINE.md`](../07_TIMELINE_ENGINE.md) defines the
+[`07_TIMELINE_ENGINE.md`](../docs/07_TIMELINE_ENGINE.md) defines the
 TimelineCompiler as the authoritative source of musical events.
 The product rule "audio owns musical time" creates a temptation
 to let UI components (Playhead, Arrangement transitions) compute

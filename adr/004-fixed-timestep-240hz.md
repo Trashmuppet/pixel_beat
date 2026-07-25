@@ -9,7 +9,7 @@
 
 ## Context
 
-[`09_SCENE_SYSTEM.md`](../09_SCENE_SYSTEM.md) requires the scene
+[`09_SCENE_SYSTEM.md`](../docs/09_SCENE_SYSTEM.md) requires the scene
 to transform drum events into deterministic pixel-art animation.
 Two failure modes threatened determinism:
 - `Scene.step()` reading `System.currentTimeMillis()` to animate

@@ -9,7 +9,7 @@
 
 ## Context
 
-[`12_EXPORT_PIPELINE.md`](../12_EXPORT_PIPELINE.md) demands
+[`12_EXPORT_PIPELINE.md`](../docs/12_EXPORT_PIPELINE.md) demands
 "identical input ⇒ identical output." We must be honest about
 what that's measurable against: byte-identical WAV and GIF are
 fully achievable; MP4 on hardware H.264 encoders is not.
