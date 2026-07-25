@@ -156,6 +156,7 @@ dependencies {
     implementation(project(":scene-runtime"))
     implementation(project(":scene-warehouse"))
     implementation(project(":scene-neon"))
+    implementation(project(":scene-void"))
 
     // Features.
     implementation(project(":feature-home"))

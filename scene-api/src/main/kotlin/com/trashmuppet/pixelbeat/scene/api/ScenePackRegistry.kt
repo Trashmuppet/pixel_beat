@@ -42,7 +42,14 @@ object ScenePackRegistry {
             displayName = "The Void",
             description = "Minimal deep space isolation.",
             requiresPro = true,
-            sceneFactory = { throw UnsupportedOperationException("The Void scene not yet implemented") }
+            // Reflective instantiation keeps [:scene-api] decoupled from
+            // [:scene-void]. Pro-gating via ProGate composable ensures
+            // this factory is only invoked when the user is entitled.
+            sceneFactory = {
+                Class.forName("com.trashmuppet.pixelbeat.scene.void.VoidScene")
+                    .getDeclaredConstructor()
+                    .newInstance() as Scene
+            }
         )
     )
 }
