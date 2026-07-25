@@ -14,5 +14,11 @@ import kotlinx.serialization.Serializable
 data class HitEvent(
     val tick: Long,
     val trackId: String,
-    val velocity: Float = 1.0f
+    val velocity: Float = 1.0f,
+    /**
+     * Position of this hit within the track's own cycle
+     * (uses track.lengthSteps when present, else pattern.lengthSteps).
+     * Phase 8: enables polyrhythmic scenes / phase-aware rendering.
+     */
+    val tickModulo: Long = 0L
 )

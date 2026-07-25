@@ -131,6 +131,7 @@ class TimelineCompiler {
                 track = track,
                 patternId = pattern.id,
                 barStartSample = barStartSample,
+                patternLengthSteps = pattern.lengthSteps,
                 samplesPerBeat = samplesPerBeat,
                 swing = swing,
                 out = out
@@ -143,31 +144,48 @@ class TimelineCompiler {
         track: Track,
         patternId: String,
         barStartSample: Long,
+        patternLengthSteps: Int,
         samplesPerBeat: Long,
         swing: SwingMode,
         out: MutableList<HitEvent>
     ) {
-        val stepsPerBeat = when (swing.granularity) {
+        // Phase 8: per-track swing override → fall back to project swing.
+        val effectiveSwing = track.swingOverride ?: swing
+        val stepsPerBeat = when (effectiveSwing.granularity) {
             SwingMode.Granularity.NONE -> 4             // 16th = 4 / beat
             SwingMode.Granularity.EIGHTH -> 2           // 8th
             SwingMode.Granularity.SIXTEENTH -> 1       // 16th
         }
-        val swingFactor = swing.amount.coerceIn(0f, 1f)
+        val swingFactor = effectiveSwing.amount.coerceIn(0f, 1f)
         val swingOffsetInSamples = (samplesPerBeat.toDouble() * 0.5 * swingFactor).roundToLong()
 
-        track.steps.forEachIndexed { stepIndex, active ->
-            if (!active) return@forEachIndexed
-            // Each `lengthSteps` slice is one pattern's bar worth of sub-beats.
-            // It's compiled relative to `barStartSample`.
+        // Phase 8: polyrhythm — wrap the track sequence to a per-track cycle size.
+        // When track.lengthSteps is null, inherits the pattern length so the loop
+        // counts `lengthSteps` from the start of each pattern, identical to v1.
+        val cycleSize = track.lengthSteps ?: patternLengthSteps
+
+        for (stepIndex in 0 until patternLengthSteps) {
+            val trackStepIndex = stepIndex % cycleSize
+            // Defensive wrap in case cycleSize > steps.size (legacy import where
+            // lengthSteps was bumped but the steps list was left at the old size).
+            val safeIndex = trackStepIndex % track.steps.size
+            val active = track.steps[safeIndex]
+            if (!active) continue
+
+            val velocity = track.velocities?.getOrNull(safeIndex) ?: 1.0f
+
             val nominalStep = barStartSample + (samplesPerBeat * stepIndex / stepsPerBeat)
-            val swingApplied = if (stepIndex % 2 == 1 && swing.granularity != SwingMode.Granularity.NONE) {
+            val swingApplied = if (stepIndex % 2 == 1 && effectiveSwing.granularity != SwingMode.Granularity.NONE) {
                 nominalStep + swingOffsetInSamples
             } else {
                 nominalStep
             }
+
             out += HitEvent(
                 tick = swingApplied,
-                trackId = "$projectId/$patternId/${track.id}"
+                trackId = "$projectId/$patternId/${track.id}",
+                velocity = velocity,
+                tickModulo = trackStepIndex.toLong()
             )
         }
     }
