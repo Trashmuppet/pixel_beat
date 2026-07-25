@@ -24,9 +24,9 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.trashmuppet.pixelbeat.core.ui.AnimatedPlayhead
 import com.trashmuppet.pixelbeat.core.ui.MonoPalette
 import com.trashmuppet.pixelbeat.core.ui.PatternSelector
-import com.trashmuppet.pixelbeat.core.ui.Playhead
 import com.trashmuppet.pixelbeat.core.ui.StepCell
 import com.trashmuppet.pixelbeat.core.ui.SwingControl
 import com.trashmuppet.pixelbeat.core.ui.TapTarget
@@ -70,7 +70,12 @@ fun SequencerScreen(
                     onSelect = { viewModel.selectPattern(it) }
                 )
 
-                Playhead(stepIndex = state.playheadStep, totalSteps = pattern.lengthSteps)
+                AnimatedPlayhead(
+                    samplePosition = state.samplePosition,
+                    sampleRate = AUDIO_SAMPLE_RATE,
+                    bpm = project.bpm,
+                    totalSteps = pattern.lengthSteps
+                )
 
                 pattern.tracks.forEach { track ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -149,5 +154,8 @@ fun SequencerScreen(
         }
     }
 }
+
+/** Authoritative sample rate — `08_AUDIO_ENGINE.md` pins 48 kHz. */
+private const val AUDIO_SAMPLE_RATE: Int = 48_000
 
 

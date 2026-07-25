@@ -42,4 +42,12 @@ dependencies {
     api(libs.compose.material3)
     api(libs.compose.ui.graphics)
     debugImplementation(libs.compose.ui.tooling)
+
+    // PlayheadMath unit tests — verify sixteenth-sample + sample→fraction
+    // math without spinning a Compose runtime. ADR-004 invariant.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
 }
+
+// Phase 6 §13 docs require JUnit 5 platform for module-level unit tests.
+tasks.withType<Test> { useJUnitPlatform() }

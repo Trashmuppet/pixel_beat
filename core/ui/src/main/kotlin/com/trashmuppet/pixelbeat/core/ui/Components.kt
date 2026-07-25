@@ -1,5 +1,6 @@
 package com.trashmuppet.pixelbeat.core.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,10 +27,16 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -160,8 +167,9 @@ fun PatternSelector(
 }
 
 /**
- * Playhead visualisation — a vertical bar above the active step.
- * The bar slides deterministically; Compose handles the layout.
+ * Discrete-step playhead — back-compatible entrypoint for tests and
+ * call sites that don't have a live transport sample. Live UI uses
+ * [AnimatedPlayhead] instead; see ADR-001.
  */
 @Composable
 fun Playhead(
@@ -185,6 +193,150 @@ fun Playhead(
                 .background(MonoPalette.Foreground)
                 .padding(start = safeIndex * widthPerStep.toFloat().coerceAtLeast(1f).dp)
         )
+    }
+}
+
+/**
+ * Pure-math contract used by [AnimatedPlayhead].
+ *
+ * Kept as an `internal object` so the unit test in `core/ui/src/test`
+ * exercises the wire-level math without needing a Compose runtime.
+ *
+ * Cited contracts:
+ *  - `09_SCENE_SYSTEM.md` — Scene simulation is fixed 240 Hz.
+ *  - ADR-004 — `Scene.step()` MUST be pure; the playhead UI MAY
+ *    interpolate visually but the tick position is owned by the
+ *    transport (ADR-001).
+ *
+ * @see AnimatedPlayhead
+ */
+internal object PlayheadMath {
+    /**
+     * Number of audio samples in one 16th note at the given BPM.
+     *
+     * `sixteenthSeconds = 60 / bpm / 4` ⇒ `sixteenthSamples = sampleRate * sixteenthSeconds`.
+     */
+    fun sixteenthSampleCount(sampleRate: Int, bpm: Float): Long {
+        require(sampleRate > 0) { "sampleRate must be positive" }
+        require(bpm > 0f) { "bpm must be positive" }
+        val sixteenthSeconds = 60.0 / bpm.toDouble() / 4.0
+        return (sampleRate.toDouble() * sixteenthSeconds).toLong().coerceAtLeast(1L)
+    }
+
+    /**
+     * Map an elapsed sample position to a fractional playhead position
+     * in `[0f, 1f)` across the current [totalSteps] bar. Wraps modulo
+     * `totalSteps` so the playhead visually loops with the project.
+     *
+     * `stepFloat = stepIndex + (sampleInSixteenth / sixteenthSamples)`.
+     * Result clamped to `[0f, 1f)` so sub-pixel overflow can't leak.
+     */
+    fun sampleToStepFraction(sample: Long, sixteenthSamples: Long, totalSteps: Int): Float {
+        require(sixteenthSamples > 0) { "sixteenthSamples must be positive" }
+        if (totalSteps <= 0) return 0f
+        val safeSample = sample.coerceAtLeast(0L)
+        val stepIndex = ((safeSample / sixteenthSamples) % totalSteps).toInt()
+        val fracInStep = ((safeSample % sixteenthSamples).toFloat() / sixteenthSamples.toFloat())
+            .coerceIn(0f, 1f)
+        val stepFloat = stepIndex + fracInStep
+        return (stepFloat / totalSteps.toFloat()).coerceIn(0f, 1f)
+    }
+}
+
+/**
+ * Animated playhead bar.
+ *
+ * The transport ([RealtimeTransport]) emits sample-accurate positions
+ * via `positionFlow()`. UI must not own the tick counter (ADR-001).
+ * To avoid jitter between emissions (audio buffers fire every few
+ * ms; Compose frames every ~16 ms), we render the bar at a
+ * sub-step fractional position derived from the **last transport
+ * emission timestamp + the current `withFrameNanos` delta**.
+ *
+ * `09_SCENE_SYSTEM.md` and ADR-004 codify that the *tick position*
+ * stays on the transport — this component only smooths the *visual*
+ * position. The `stepIndex` math runs in [PlayheadMath] so it's test
+ * independent of Compose.
+ *
+ * @param samplePosition  Latest transport sample position (Long).
+ * @param sampleRate      Audio sample rate (typically 48 kHz).
+ * @param bpm             Current project BPM (used for sixteenth math).
+ * @param totalSteps      Pattern length step count (e.g. 16).
+ * @param modifier        Layout modifier from the parent.
+ * @param barHeightDp     Marker bar height.
+ * @param markerWidthDp   Marker bar width.
+ */
+@Composable
+fun AnimatedPlayhead(
+    samplePosition: Long,
+    sampleRate: Int,
+    bpm: Float,
+    totalSteps: Int,
+    modifier: Modifier = Modifier,
+    barHeightDp: Dp = 6.dp,
+    markerWidthDp: Dp = 4.dp
+) {
+    // Defensive: render an empty background while inputs are invalid
+    // so the parent layout doesn't collapse mid-flight.
+    if (totalSteps <= 0 || sampleRate <= 0 || bpm <= 0f) {
+        Box(modifier.fillMaxWidth().height(barHeightDp).background(MonoPalette.Background))
+        return
+    }
+
+    val sixteenthSamples = remember(sampleRate, bpm) {
+        PlayheadMath.sixteenthSampleCount(sampleRate, bpm)
+    }
+
+    // Last transport emission: anchor for frame-time interpolation.
+    val lastEmitNanos = remember { mutableLongStateOf(0L) }
+    val lastEmitSample = remember(samplePosition) { mutableLongStateOf(samplePosition) }
+
+    LaunchedEffect(samplePosition) {
+        // When samplePosition changes, capture the frame nanos at
+        // the moment we observed it. The next animation frame will
+        // project forward from this anchor.
+        withFrameNanos { now -> lastEmitNanos.longValue = now }
+        lastEmitSample.longValue = samplePosition
+    }
+
+    // Continuous frame-locked smoothing loop. ADR-001 explicitly
+    // permits withFrameNanos for visual smoothing — only the tick
+    // position is owned by the transport.
+    val frameSample = remember { mutableLongStateOf(samplePosition.coerceAtLeast(0L)) }
+    LaunchedEffect(sampleRate, sixteenthSamples) {
+        while (true) {
+            val now = withFrameNanos { it }
+            val elapsedNanos = (now - lastEmitNanos.longValue).coerceAtLeast(0L)
+            val projected = lastEmitSample.longValue +
+                (elapsedNanos.toDouble() * sampleRate.toDouble() / 1_000_000_000.0).toLong()
+            frameSample.longValue = projected.coerceAtLeast(0L)
+        }
+    }
+
+    val fraction = PlayheadMath.sampleToStepFraction(
+        sample = frameSample.longValue,
+        sixteenthSamples = sixteenthSamples,
+        totalSteps = totalSteps
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(barHeightDp)
+            .background(MonoPalette.Background)
+            .semantics { contentDescription = "Playhead at fraction ${(fraction * 100f).toInt()} percent" },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val canvasWidth = size.width
+            val safeMarkerWidth = minOf(markerWidthDp.toPx(), canvasWidth)
+            val x = (fraction * (canvasWidth - safeMarkerWidth)).coerceIn(0f, canvasWidth - safeMarkerWidth)
+            drawRect(
+                color = MonoPalette.Foreground,
+                topLeft = Offset(x, 0f),
+                size = Size(safeMarkerWidth, size.height)
+            )
+        }
     }
 }
 

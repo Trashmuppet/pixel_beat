@@ -44,6 +44,13 @@ data class SequencerState(
     val project: MBeatProject? = null,
     val currentPatternIndex: Int = 0,
     val playheadStep: Int = 0,
+    /**
+     * Latest transport-emitted sample position. Per ADR-001 the tick
+     * position is owned by the transport; [AnimatedPlayhead] reads this
+     * verbatim and uses `withFrameNanos` to smoothly interpolate
+     * visually between emissions without ever owning the tick itself.
+     */
+    val samplePosition: Long = 0L,
     val isPlaying: Boolean = false,
     val isLoading: Boolean = true,
     val error: String? = null
@@ -199,7 +206,12 @@ class SequencerViewModel(
                 val stepIndex = (samplePosition / sixteenthNoteSamples)
                     .toInt()
                     .mod(totalSteps)
-                _state.update { it.copy(playheadStep = stepIndex) }
+                _state.update {
+                    // Publish both the authoritative integer step AND
+                    // the raw sample position so AnimatedPlayhead can
+                    // interpolate visually with withFrameNanos (ADR-001).
+                    it.copy(playheadStep = stepIndex, samplePosition = samplePosition)
+                }
             }
         }
     }
