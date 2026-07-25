@@ -1,0 +1,33 @@
+# --- Gradle ---
+.gradle/
+**/build/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+gradle-app.setting
+
+# --- Android ---
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+local.properties
+.cxx/
+
+# --- Kotlin ---
+.kotlin/
+
+# --- IDEs ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+captures/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Exported media (per docs/.gitignore rules) ---
+exports/
