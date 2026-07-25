@@ -40,12 +40,23 @@ android {
     }
 }
 
+// Variant 2 of the KSP [MissingType] investigation:
+//   Replace the single `room.schemaLocation` arg with the
+//   `room.incremental` + `room.generateKotlin` arg pair.
+//   KSP 2.0.21-1.0.28 changed the supported arg set vs. 2.0.20;
+//   an unknown arg can fail silently and surface as `[MissingType]`.
+//   Variant 1 (remove ksp block entirely) failed identically, so
+//   the arg content is not the trigger — but this Variant covers
+//   the case where KSP rejects the path arg silently.
+//
+// Original (Variant 0) was `arg("room.schemaLocation", "$projectDir/schemas")`.
+// Phase 6+ originally called for `MigrationTestHelper` to drive
+// the v1 → v2 test on the 1.json / 2.json snapshots. We can re-add
+// the schemaLocation arg in a follow-up once the KSP regression
+// is settled — the migration test still passes via runtime ALTER TABLE.
 ksp {
-    // Phase 6+: emit `1.json` + `2.json` schema snapshots so
-    // `MigrationTestHelper` in `StorageDatabaseMigrationTest` can
-    // boot the v1 fixture and assert the additive migration. Path
-    // is canonical to the AGP 8.7 / KSP 2.0.21 DSL.
-    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.incremental", "true")
+    arg("room.generateKotlin", "true")
 }
 
 dependencies {
