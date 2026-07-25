@@ -76,18 +76,21 @@ class PlayheadMathTest {
 
     @Test
     fun `invalid sample rate rejected`() {
-        assertThrows<IllegalArgumentException> {
+        assertThrows(IllegalArgumentException::class.java) {
             PlayheadMath.sixteenthSampleCount(0, 120f)
+            Unit
         }
     }
 
     @Test
     fun `invalid bpm rejected`() {
-        assertThrows<IllegalArgumentException> {
+        assertThrows(IllegalArgumentException::class.java) {
             PlayheadMath.sixteenthSampleCount(48_000, 0f)
+            Unit
         }
-        assertThrows<IllegalArgumentException> {
+        assertThrows(IllegalArgumentException::class.java) {
             PlayheadMath.sixteenthSampleCount(48_000, -1f)
+            Unit
         }
     }
 }
