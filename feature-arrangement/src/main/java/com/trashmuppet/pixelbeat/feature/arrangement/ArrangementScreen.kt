@@ -15,6 +15,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,10 +61,42 @@ fun ArrangementScreen(
                 color = MonoPalette.Foreground
             )
             else -> {
+                // Loop editor — two discrete sliders pinned to integer
+                // bar positions (steps = 62 ⇒ 64 stops across 0..63
+                // per Compose Slider math). Edits hit the debounced
+                // save collector so a slider drag doesn't thrash I/O.
                 Text(
-                    "Loop bars ${state.loop.startBar}..${state.loop.endBar}",
+                    "Loop: bars ${state.loop.startBar}..${state.loop.endBar}",
                     color = MonoPalette.Foreground,
                     fontSize = 14.sp
+                )
+                Slider(
+                    value = state.loop.startBar.coerceIn(0, 63).toFloat(),
+                    onValueChange = { v ->
+                        val newStart = v.toInt().coerceIn(0, state.loop.endBar)
+                        viewModel.setLoop(newStart, state.loop.endBar)
+                    },
+                    valueRange = 0f..63f,
+                    steps = 62,
+                    colors = loopSliderColors(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .sizeIn(minHeight = TapTarget)
+                        .semantics { contentDescription = "Loop start bar" }
+                )
+                Slider(
+                    value = state.loop.endBar.coerceIn(0, 63).toFloat(),
+                    onValueChange = { v ->
+                        val newEnd = v.toInt().coerceAtLeast(state.loop.startBar)
+                        viewModel.setLoop(state.loop.startBar, newEnd)
+                    },
+                    valueRange = 0f..63f,
+                    steps = 62,
+                    colors = loopSliderColors(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .sizeIn(minHeight = TapTarget)
+                        .semantics { contentDescription = "Loop end bar" }
                 )
 
                 // Pattern slots — drag-reorder is wired through
@@ -92,7 +126,7 @@ fun ArrangementScreen(
 
                 SwingControl(
                     swing = state.project?.swing ?: com.trashmuppet.pixelbeat.core.model.SwingMode(),
-                    onSwingChange = { /* arrangement owns structure; swing belongs to sequencer */ }
+                    onSwingChange = { viewModel.setSwing(it) }
                 )
             }
         }
@@ -127,6 +161,14 @@ fun ArrangementScreen(
         }
     }
 }
+
+/** Mono slider colours — same palette as [TempoControl] / [SwingControl]. */
+@Composable
+private fun loopSliderColors() = SliderDefaults.colors(
+    thumbColor = MonoPalette.Foreground,
+    activeTrackColor = MonoPalette.Foreground,
+    inactiveTrackColor = MonoPalette.Background
+)
 
 @Composable
 private fun ArrangementSlot(

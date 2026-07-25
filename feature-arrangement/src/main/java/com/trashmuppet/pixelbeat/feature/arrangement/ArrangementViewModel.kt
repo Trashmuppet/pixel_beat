@@ -8,10 +8,16 @@ import com.trashmuppet.pixelbeat.core.common.Result
 import com.trashmuppet.pixelbeat.core.model.LoopBoundary
 import com.trashmuppet.pixelbeat.core.model.MBeatProject
 import com.trashmuppet.pixelbeat.core.model.Pattern
+import com.trashmuppet.pixelbeat.core.model.SwingMode
 import com.trashmuppet.pixelbeat.storage.ProjectRepository
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -25,6 +31,7 @@ data class ArrangementState(
     val patternLookup: Map<String, Pattern> get() = project?.patterns?.associateBy { it.id } ?: emptyMap()
 }
 
+@OptIn(FlowPreview::class)
 class ArrangementViewModel(
     private val dispatchers: AppDispatchers,
     private val repository: ProjectRepository,
@@ -34,7 +41,21 @@ class ArrangementViewModel(
     private val _state = MutableStateFlow(ArrangementState())
     val state: StateFlow<ArrangementState> = _state.asStateFlow()
 
-    init { load(initialProjectId) }
+    init {
+        load(initialProjectId)
+        // Debounced save: catches state mutations from slider drags
+        // (setSwing / setLoop) and quick toggles without producing
+        // one save per frame.
+        viewModelScope.launch(dispatchers.io) {
+            _state
+                .map { it.project }
+                .distinctUntilChanged()
+                .debounce(SAVE_DEBOUNCE_MS)
+                .collectLatest { project ->
+                    if (project != null) repository.save(project)
+                }
+        }
+    }
 
     private fun load(id: String?) {
         viewModelScope.launch(dispatchers.io) {
@@ -98,6 +119,11 @@ class ArrangementViewModel(
         commit()
     }
 
+    /**
+     * Persist the arrangement's loop bar range. Slider-driven so we
+     * rely on the debounced collector in [init] for the write; we
+     * only update state here.
+     */
     fun setLoop(startBar: Int, endBar: Int) {
         _state.update { current ->
             val project = current.project ?: return@update current
@@ -107,7 +133,18 @@ class ArrangementViewModel(
                 )
             ))
         }
-        commit()
+    }
+
+    /**
+     * Update swing mode. Mirrors [SequencerViewModel.setSwing]; both
+     * screens can edit swing because each commits the full project
+     * document. Slider-driven, relies on the debounced init collector.
+     */
+    fun setSwing(swing: SwingMode) {
+        _state.update { current ->
+            val project = current.project ?: return@update current
+            current.copy(project = project.copy(swing = swing))
+        }
     }
 
     fun commit() {
@@ -121,6 +158,7 @@ class ArrangementViewModel(
 
     companion object {
         private const val NEW_PROJECT_ID = "new"
+        private const val SAVE_DEBOUNCE_MS = 800L
 
         fun factory(dispatchers: AppDispatchers,
                     repository: ProjectRepository,

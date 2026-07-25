@@ -25,13 +25,19 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
+    implementation(project(":core:common"))
     implementation(project(":core:ui"))
     implementation(project(":core:timeline"))
+    implementation(project(":storage"))
 
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
+    // ViewModel + viewModelScope + ViewModelProvider live here.
+    // Transitive on lifecycle-viewmodel-ktx which provides viewModelScope.
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.kotlinx.coroutines.android)
     debugImplementation(libs.compose.ui.tooling)
 }

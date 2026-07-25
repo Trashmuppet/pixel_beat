@@ -93,7 +93,15 @@ fun SequencerScreen(
                             track.steps.forEachIndexed { stepIndex, active ->
                                 StepCell(
                                     active = active,
-                                    onToggle = { viewModel.toggleStep(track.id, stepIndex) }
+                                    onToggle = { viewModel.toggleStep(track.id, stepIndex) },
+                                    // Per ADR-001 the tick position is owned
+                                    // by the transport; SequencerViewModel
+                                    // derives `state.playheadStep` from
+                                    // transport.positionFlow inside play().
+                                    // We just forward that authoritative
+                                    // value to the cell for the visual
+                                    // pulse per 16_UI_BIBLE.md §Playing.
+                                    isPlayheadStep = (stepIndex == state.playheadStep)
                                 )
                             }
                         }

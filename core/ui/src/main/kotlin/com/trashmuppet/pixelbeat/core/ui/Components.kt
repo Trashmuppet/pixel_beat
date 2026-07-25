@@ -61,6 +61,12 @@ import com.trashmuppet.pixelbeat.core.model.SwingMode
  * One step in the 16-step grid. Inverted (foreground fill) when
  * active. Tappable with haptic confirmation.
  *
+ * When [isPlayheadStep] is true the cell additionally inverts — the
+ * fill XORs against [active] so the playhead pulses a visual
+ * "passing through" affordance in 1-bit (ADR-001 + `16_UI_BIBLE.md`
+ * §Playing state). The tick position itself is still owned by the
+ * transport; this only paints the visual marker.
+ *
  * Tap target >= 48dp per `16_UI_BIBLE.md`. Colours are mono.
  */
 @Composable
@@ -68,24 +74,39 @@ fun StepCell(
     active: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
-    cellSize: Dp = 48.dp
+    cellSize: Dp = 48.dp,
+    isPlayheadStep: Boolean = false
 ) {
     val haptic = LocalHapticFeedback.current
     val fg = MonoPalette.Foreground
     val bg = MonoPalette.Background
+    // 1-bit semantics:
+    //   active || at playhead  -> solid FG fill (cell is lit)
+    //   neither                -> BG fill, FG border (cell is empty)
+    // The playhead additionally bumps the border from 1.dp to 2.dp so
+    // the cursor line is visible regardless of cell activity — both
+    // signals preserved without the XOR "active+delayed-flip" surprise.
+    val fill = if (active || isPlayheadStep) fg else bg
+    val borderWidth = if (isPlayheadStep) 2.dp else 1.dp
     Box(
         modifier = modifier
             .size(cellSize)
             .clip(RoundedCornerShape(4.dp))
-            .border(width = 1.dp, color = fg)
-            .background(if (active) fg else bg)
+            .border(width = borderWidth, color = fg)
+            .background(fill)
             .clickable {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onToggle()
             }
             .semantics {
-                contentDescription = if (active) "Active step" else "Inactive step"
+                contentDescription = when {
+                    active && isPlayheadStep -> "Active step, playing now"
+                    isPlayheadStep -> "Playhead position, inactive"
+                    active -> "Active step"
+                    else -> "Inactive step"
+                }
                 role = Role.Checkbox
+                stateDescription = if (isPlayheadStep) "playing" else "idle"
             }
     )
 }
