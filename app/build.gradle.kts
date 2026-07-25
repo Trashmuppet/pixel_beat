@@ -173,7 +173,10 @@ dependencies {
     // Performance
     implementation("androidx.metrics:metrics-performance:1.0.0-beta01")
 
-    // Phase 6 — baselineprofile project available to macrobenchmark
-    // tasks but kept out of the runtime classpath.
-    baselineProfile(project(":baselineprofile"))
+    // Phase 6 — :baselineprofile emits a ProfileInstaller AAR whose classes
+    // the app ships at runtime. AGP 8.7 deprecated the dedicated `baselineProfile(...)`
+    // DSL on the app module's `dependencies` block; using `implementation(project(...))`
+    // gives the app the same compile-time AAR while leaving the macrobenchmark tasks
+    // on `androidx.benchmark` to consume the profile install rules at run time.
+    implementation(project(":baselineprofile"))
 }
