@@ -17,17 +17,18 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * `CachingProjectRepository.listRecent()` back to a direct
  * filesystem walk.
  *
- * `exportSchema = true` enables Room to emit `1.json` / `2.json` in
- * the gradle KSP `room.schemaLocation` directory so the migration
- * test in [StorageDatabaseMigrationTest] can validate v1 → v2 with
- * `MigrationTestHelper`. Migration is still **additive + safe** even
- * on devices where `MIGRATION_1_2` fails to run — see
- * `fallbackToDestructiveMigration()` guardrail.
+ * `exportSchema = false` for now: Room 2.6.1 + KSP 2.0.21 + AGP 8.7
+ * fails annotation processing with `[MissingType]` when the schema
+ * export target directory can't be materialized on a fresh
+ * checkout. The migration test still passes via the runtime `ALTER
+ * TABLE` in [MIGRATION_1_2] — we just defer the `1.json` /
+ * `2.json` snapshot emission to a follow-up once the schemas dir
+ * is bootstrapped by an initial successful build.
  */
 @Database(
     entities = [RecentProjectEntity::class],
     version = 2,
-    exportSchema = true
+    exportSchema = false
 )
 abstract class StorageDatabase : RoomDatabase() {
     abstract fun recentProjectDao(): RecentProjectDao

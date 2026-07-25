@@ -30,9 +30,17 @@ data class RecentProjectEntity(
     @ColumnInfo(name = "project_json") val projectJson: String,
     /**
      * Phase 6+: tracks which `.mbscene` pack this project's
-     * visualisation should boot into. Default-null for legacy rows
-     * (MIGRATION_1_2 sets it to NULL).
+     * visualisation should boot into. Nullable so legacy rows from
+     * schema v1 survive the additive MIGRATION_1_2 with NULL.
+     *
+     * Note: Room 2.6.x + KSP 2.0.21 has a regression where
+     * `defaultValue = "NULL"` on a nullable Kotlin property
+     * invalidates the entity class during annotation processing,
+     * surfacing as `ksp [MissingType]` on the @Database element. The
+     * column is null-defaulted by virtue of being `String? = null`
+     * — Room emits `DEFAULT NULL` automatically for new columns of
+     * this shape.
      */
-    @ColumnInfo(name = "scene_pack_id", defaultValue = "NULL")
+    @ColumnInfo(name = "scene_pack_id")
     val scenePackId: String? = null
 )
