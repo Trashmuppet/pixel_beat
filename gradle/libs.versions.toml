@@ -22,6 +22,11 @@ playBilling = "7.1.1"
 # Room (rebuildable recent-projects cache per docs/14_STORAGE.md)
 room = "2.6.1"
 
+# Test scaffolding (Phase 6 close-out: MigrationTestHelper on Robolectric)
+robolectric = "4.13"
+androidxTestExtJunit = "1.2.1"
+androidxTestCore = "1.6.1"
+
 [libraries]
 # Kotlinx
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -53,6 +58,12 @@ play-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.r
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
+
+# Test scaffolding — Robolectric + AndroidJUnit4 for Room MigrationTestHelper
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestExtJunit" }
+androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
