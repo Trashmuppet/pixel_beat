@@ -79,6 +79,14 @@ class AnimationSystem(val scene: Scene) {
     fun currentTick(): Long = currentTick
     fun pendingCount(): Int = pendingHits.size
 
+    /**
+     * The most recent `SceneRenderState` returned by `Scene.step()`
+     * after the last `advance`. Used by the export pipeline to pull
+     * framebuffers for `GifEncoder`/`Mp4MediaCodecEncoder` without
+     * coupling those encoders to the scene's internal queue.
+     */
+    fun latestRenderState(): SceneRenderState? = lastState
+
     private fun emptyState(): SceneRenderState = LAST_EMPTY
 
     companion object {

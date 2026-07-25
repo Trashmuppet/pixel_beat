@@ -50,6 +50,12 @@ include(":scene-api")
 include(":scene-runtime")
 include(":scene-warehouse")
 
+// Phase 5 export pipeline (WAV / GIF / MP4 media encoders)
+include(":core:export")
+
+// Phase 6 macrobenchmark + BaselineProfile scaffolding
+include(":baselineprofile")
+
 // User-visible features
 include(":feature-home")
 include(":feature-project")

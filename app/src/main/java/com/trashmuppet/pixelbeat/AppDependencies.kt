@@ -1,21 +1,28 @@
 package com.trashmuppet.pixelbeat
 
 import android.content.Context
+import com.trashmuppet.pixelbeat.audio.AudioEngine
 import com.trashmuppet.pixelbeat.core.common.AppDispatchers
 import com.trashmuppet.pixelbeat.core.common.DefaultAppDispatchers
+import com.trashmuppet.pixelbeat.core.export.AudioFramesSource
+import com.trashmuppet.pixelbeat.core.export.CompatibilityExporter
+import com.trashmuppet.pixelbeat.core.export.ExportPipeline
 import com.trashmuppet.pixelbeat.core.timeline.RealtimeTransport
 import com.trashmuppet.pixelbeat.core.timeline.TestRealtimeTransport
 import com.trashmuppet.pixelbeat.feature.export.MediaExporter
+import com.trashmuppet.pixelbeat.scene.runtime.AnimationSystem
+import com.trashmuppet.pixelbeat.scene.warehouse.WarehouseScene
 import com.trashmuppet.pixelbeat.storage.ProjectRepository
 import com.trashmuppet.pixelbeat.storage.StorageProjectRepository
 
 /**
- * Application-scoped dependency container.
+ * Application-scoped dependency container (Phase 3 wiring).
  *
- * Phase 3 ships without DI frameworks — we hand-construct the
- * dependencies once in `MainActivity` and pass them through
- * CompositionLocals / arguments. Phase 6 will replace this with a
- * code-generated DI graph (per ADR-006).
+ * Phase 5 wires a real `CompatibilityExporter` over a production
+ * `ExportPipeline` (real WavEncoder / GifEncoder / Mp4MediaCodecEncoder)
+ * and a `DefaultAudioFramesSource` that drives the on-device
+ * `AudioEngine` + `TimelineCompiler`. ADR-006 plans a code-generated
+ * DI graph for Phase 6; this hand-rolled container stays until then.
  */
 class AppDependencies(applicationContext: Context) {
     val dispatchers: AppDispatchers = DefaultAppDispatchers()
@@ -23,24 +30,15 @@ class AppDependencies(applicationContext: Context) {
         StorageProjectRepository(applicationContext, dispatchers)
     val transport: RealtimeTransport = TestRealtimeTransport()
 
-    /**
-     * Phase 3 ships a no-op exporter; Phase 5 wires WavEncoder /
-     * GifEncoder / Mp4MediaCodecEncoder here.
-     */
-    val exporter: MediaExporter = object : MediaExporter {
-        override suspend fun export(
-            project: com.trashmuppet.pixelbeat.core.model.MBeatProject,
-            outputFile: java.io.File,
-            format: com.trashmuppet.pixelbeat.feature.export.ExportFormat,
-            resolution: com.trashmuppet.pixelbeat.feature.export.ExportResolution,
-            onProgress: suspend (Float, String) -> Unit
-        ) {
-            // Pretend progress so the UI bar moves while we wait for the
-            // real Phase 5 implementation. Deterministic — three ticks.
-            onProgress(0.0f, "Phase 5 placeholder")
-            onProgress(1.0f, "Done")
-            outputFile.parentFile?.mkdirs()
-            outputFile.writeText("# placeholder export")
-        }
-    }
+    /** Phase 5 audio source. Streams `renderOffline(float[s])` from the engine. */
+    val audioFrames: AudioFramesSource = DefaultAudioFramesSource(AudioEngine.instance)
+
+    /** Phase 5 scene driver. WarehouseScene wired per `09_SCENE_SYSTEM.md` reference impl. */
+    private val scene: AnimationSystem = AnimationSystem(WarehouseScene())
+
+    /** Phase 5 export orchestrator. */
+    private val exportPipeline: ExportPipeline = ExportPipeline(audioFrames, scene)
+
+    /** Phase 5 `MediaExporter` — backed by the real Wav/Gif/Mp4 encoders. */
+    val exporter: MediaExporter = CompatibilityExporter(exportPipeline)
 }
