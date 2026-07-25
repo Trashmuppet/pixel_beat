@@ -1,0 +1,215 @@
+# Trashmuppet/pixel_beat — Continuous Integration
+#
+# Per ADR-006 §Continuous integration, CI runs at minimum:
+#     ./gradlew :app:assembleDebug :core:timeline:test :scene-runtime:test :core:export:test
+# on every Pull Request.
+#
+# Beyond that minimum, this workflow also runs:
+#     - PlayheadMathTest (cheapest deterministic check — its only job is to
+#       guarantee `:core:ui` compiles, KGP works, and the AnimatedPlayhead
+#       math holds; if it can't run, nothing else can either, so it gates
+#       the rest per ADR-004 §Fixed-timestep 240Hz Scene Simulation).
+#     - The full unit-test matrix the spec calls for:
+#           :core:timeline:test
+#           :scene-runtime:test
+#           :core:export:test
+#           :core:ui:testDebugUnitTest
+#           :asset-compiler:test
+#           :storage:test
+#
+# All jobs: JDK 17 + Gradle cache via gradle/actions/setup-gradle@v6,
+# Android SDK 36 with build-tools 36.0.0 licensed, ubuntu-latest runner.
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'freebuff/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+# ADR-006 §CI hygiene: cancel superseded runs on the same ref so we don't
+# burn runners when a PR is force-pushed mid-build.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # AGP + Compose Compiler Reports + R8 chew memory. -Xmx4g is what the local
+  # box uses; mirrors `.gradle/gradle.properties`.
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g -XX:+UseParallelGC -Dfile.encoding=UTF-8
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. PlayheadMathTest — cheapest deterministic gate.
+  #    ADR-004 §Fixed-timestep 240Hz Scene Simulation: tick position is owned
+  #    by the transport, only withFrameNanos visual smoothing is permitted.
+  #    The PlayheadMath suite pins those contracts.
+  # ---------------------------------------------------------------------------
+  playhead-gate:
+    name: PlayheadMathTest (ADR-004 / ADR-006 gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Setup JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK (platform 36, build-tools 36.0.0)
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '11076708'
+          api-level: '36'
+          build-tools-version: '36.0.0'
+          cache-packages: true
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null
+
+      - name: Setup Gradle (wrapper + dependency cache)
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-disabled: false
+          # gradle-home-cache-cleanup removes stale caches >7 days old.
+          gradle-home-cache-cleanup: true
+
+      - name: Run PlayheadMath contract suite
+        id: playhead
+        run: >-
+          ./gradlew :core:ui:testDebugUnitTest
+          --tests com.trashmuppet.pixelbeat.core.ui.PlayheadMathTest
+          --console=plain --build-cache
+
+      - name: Upload PlayheadMath test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playhead-gate-report
+          path: |
+            core/ui/build/test-results/testDebugUnitTest/*.xml
+            core/ui/build/reports/tests/testDebugUnitTest/index.html
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # 2. :app:assembleDebug — ADR-006 §CI literal first clause.
+  #    Compiling :app proves every Android library module graph node is sound.
+  # ---------------------------------------------------------------------------
+  assemble-debug:
+    name: :app:assembleDebug (ADR-006 §CI)
+    needs: playhead-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '11076708'
+          api-level: '36'
+          build-tools-version: '36.0.0'
+          cache-packages: true
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-home-cache-cleanup: true
+
+      - name: Assemble debug APK (compiles every Android lib)
+        run: ./gradlew :app:assembleDebug --console=plain --build-cache
+
+      - name: Upload :app:assembleDebug logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-assemble-debug-logs
+          path: |
+            app/build/outputs/apk/debug/
+            app/build/reports/problems/problems-report.html
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # 3. Unit-test matrix — ADR-006 + user-requested full unit-task sweep.
+  #    Each cell runs one task. fail-fast stops the rest on first failure.
+  # ---------------------------------------------------------------------------
+  unit-test-matrix:
+    name: Unit test matrix — ${{ matrix.task }}
+    needs: playhead-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: true
+      matrix:
+        task:
+          - ':core:timeline:test'
+          - ':asset-compiler:test'
+          - ':core:ui:testDebugUnitTest'
+          - ':core:export:test'
+          - ':scene-runtime:test'
+          - ':storage:test'
+    env:
+      # ADR-005 §Deterministic tests — no wall-clock drift permitted across CI.
+      TZ: UTC
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '11076708'
+          api-level: '36'
+          build-tools-version: '36.0.0'
+          cache-packages: true
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-home-cache-cleanup: true
+
+      - name: Run ${{ matrix.task }}
+        id: task
+        run: ./gradlew ${{ matrix.task }} --console=plain --build-cache --stacktrace
+
+      - name: Upload test report XML + HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.task }}-report
+          path: |
+            **/build/test-results/**/*.xml
+            **/build/reports/tests/**/index.html
+          retention-days: 14
