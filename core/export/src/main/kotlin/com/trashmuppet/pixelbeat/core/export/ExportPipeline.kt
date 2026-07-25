@@ -141,7 +141,7 @@ class ExportPipeline(
         val width = evenUp(resolution.width)
         val height = evenUp(resolution.height)
         onProgress(0.05f, "MP4 encoder ready ($width×$height @ ${fps}fps)")
-        val encoder = Mp4MediaCodecEncoder(width, height, fps)
+        val encoder = Mp4MediaCodecEncoder(width, height, fps, animationSystem)
         encoder.encode(project, audioFrames, outputFile) { p, s ->
             onProgress(p.coerceIn(0.05f, 0.99f), s)
         }

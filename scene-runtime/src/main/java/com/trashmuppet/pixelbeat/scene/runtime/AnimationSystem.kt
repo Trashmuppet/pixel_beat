@@ -56,6 +56,7 @@ class AnimationSystem(val scene: Scene) {
                 scene.schedule(listOf(pendingHits.removeFirst()))
             }
             state = scene.step()
+            lastState = state
             currentTick += 1
         }
         return state ?: emptyState()

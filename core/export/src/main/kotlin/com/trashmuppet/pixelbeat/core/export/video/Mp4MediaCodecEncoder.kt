@@ -1,15 +1,18 @@
 package com.trashmuppet.pixelbeat.core.export.video
 
 import android.media.MediaCodec
-import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import android.opengl.EGL14
+import android.opengl.GLES20
 import com.trashmuppet.pixelbeat.core.export.AudioFramesSource
 import com.trashmuppet.pixelbeat.core.model.MBeatProject
 import com.trashmuppet.pixelbeat.scene.api.SceneRenderState
+import com.trashmuppet.pixelbeat.scene.runtime.AnimationSystem
 import kotlinx.coroutines.yield
 import java.io.File
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 /**
  * MP4 (H.264 + AAC) MediaCodec / MediaMuxer encoder.
@@ -22,8 +25,7 @@ import java.nio.ByteBuffer
  *   3. Drive a `MediaMuxer` over MP4 with one video + one audio
  *      track.
  *   4. Render each scene frame into the video encoder's EGL
- *      surface via GLES2 (bypasses Compose — this is the export
- *      thread, not the UI thread).
+ *      surface via GLES2, consuming `AnimationSystem.latestRenderState()`.
  *   5. Drain both encoders into the muxer; report progress every
  *      10 frames.
  *
@@ -36,7 +38,8 @@ import java.nio.ByteBuffer
 class Mp4MediaCodecEncoder(
     private val widthPx: Int,
     private val heightPx: Int,
-    private val fps: Int = 30
+    private val fps: Int = 30,
+    private val animationSystem: AnimationSystem
 ) {
 
     suspend fun encode(
@@ -62,7 +65,6 @@ class Mp4MediaCodecEncoder(
         var muxerStarted = false
         var videoTrackIndex = -1
         var audioTrackIndex = -1
-        var totalFrames = -1L
 
         try {
             // ------------------------------------------------------------------
@@ -71,8 +73,13 @@ class Mp4MediaCodecEncoder(
             val videoFormat = MediaFormat.createVideoFormat(
                 MediaFormat.MIMETYPE_VIDEO_AVC, evenWidth, evenHeight
             ).apply {
-                setInteger(MediaFormat.KEY_COLOR_FORMAT,
-                    MediaUtil.selectColorFormat(MediaUtil.selectVideoEncoder()!!, MediaFormat.MIMETYPE_VIDEO_AVC))
+                setInteger(
+                    MediaFormat.KEY_COLOR_FORMAT,
+                    MediaUtil.selectColorFormat(
+                        MediaUtil.selectVideoEncoder()!!,
+                        MediaFormat.MIMETYPE_VIDEO_AVC
+                    )
+                )
                 setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
                 setInteger(MediaFormat.KEY_FRAME_RATE, fps)
                 setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
@@ -87,8 +94,7 @@ class Mp4MediaCodecEncoder(
             if (hasAac) {
                 val audioFormat = MediaFormat.createAudioFormat(
                     MediaFormat.MIMETYPE_AUDIO_AAC, 48_000,
-                    /* channelCount= */ 1,
-                    /* audioFormat= */ 2
+                    /* channelCount= */ 1
                 ).apply {
                     setInteger(MediaFormat.KEY_BIT_RATE, 128_000)
                 }
@@ -98,7 +104,7 @@ class Mp4MediaCodecEncoder(
             }
 
             // ------------------------------------------------------------------
-            // Render loop
+            // Render loop — drives AnimationSystem + GLES2 into MediaCodec Surface
             // ------------------------------------------------------------------
             val egl = EglRenderTarget(inputSurface, evenWidth, evenHeight)
             egl.setup()
@@ -106,27 +112,38 @@ class Mp4MediaCodecEncoder(
 
             val totalDurationMs = (framesSource.totalSamples() * 1000L) / 48_000L
             val expectedFrames = (totalDurationMs * fps) / 1000L
-            totalFrames = expectedFrames
             var frameIndex = 0
             val frameDurationMs = 1000 / fps
 
             while (!framesSource.isExhausted()) {
                 val audioChunk = FloatArray(48_000 * frameDurationMs / 1000)
                 val framesRead = framesSource.renderChunk(audioChunk)
-                if (framesRead > 0 && audioEncoderCodec != null) {
-                    feedAudioEncoder(audioEncoderCodec, audioChunk, framesRead)
+                if (framesRead > 0) {
+                    if (audioEncoderCodec != null) {
+                        feedAudioEncoder(audioEncoderCodec, audioChunk, framesRead)
+                    }
+                    // Advance the simulation with the audio frames we consumed.
+                    animationSystem.advance(framesRead, 48_000)
                 }
-                // Render a scene frame into EGL by calling back to the
-                // composer's project state. For Phase 5 the SceneRenderState
-                // is fetched from a single-step AnimationSystem — Phase 6
-                // task list adds a richer per-frame driver.
-                val state: SceneRenderState = eglCurrentFrameState()
-                egl.drawSceneFrame(state)
+
+                // Pull the latest rendered state and draw it into the EGL surface.
+                val state: SceneRenderState? = animationSystem.latestRenderState()
+                if (state != null) {
+                    egl.drawSceneFrame(state)
+                }
 
                 // Drain encoder output periodically.
-                drainEncoder(videoEncoder, muxer, isVideo = true, trackIndexRef = { videoTrackIndex })
+                drainEncoder(
+                    videoEncoder, muxer, isVideo = true,
+                    trackIndexRef = { videoTrackIndex }, trackIndexSetter = { videoTrackIndex = it },
+                    muxerStartedRef = { muxerStarted }, muxerStartedSetter = { muxerStarted = it }
+                )
                 if (audioEncoderCodec != null) {
-                    drainEncoder(audioEncoderCodec, muxer, isVideo = false, trackIndexRef = { audioTrackIndex })
+                    drainEncoder(
+                        audioEncoderCodec, muxer, isVideo = false,
+                        trackIndexRef = { audioTrackIndex }, trackIndexSetter = { audioTrackIndex = it },
+                        muxerStartedRef = { muxerStarted }, muxerStartedSetter = { muxerStarted = it }
+                    )
                 }
 
                 frameIndex += 1
@@ -141,17 +158,35 @@ class Mp4MediaCodecEncoder(
 
             // Signal EOS.
             videoEncoder.signalEndOfInputStream()
-            drainEncoder(videoEncoder, muxer, isVideo = true, trackIndexRef = { videoTrackIndex }, eos = true)
+            drainEncoder(
+                videoEncoder, muxer, isVideo = true,
+                trackIndexRef = { videoTrackIndex }, trackIndexSetter = { videoTrackIndex = it },
+                muxerStartedRef = { muxerStarted }, muxerStartedSetter = { muxerStarted = it },
+                eos = true
+            )
             audioEncoderCodec?.let { codec ->
                 codec.signalEndOfInputStream()
-                drainEncoder(codec, muxer, isVideo = false, trackIndexRef = { audioTrackIndex }, eos = true)
+                drainEncoder(
+                    codec, muxer, isVideo = false,
+                    trackIndexRef = { audioTrackIndex }, trackIndexSetter = { audioTrackIndex = it },
+                    muxerStartedRef = { muxerStarted }, muxerStartedSetter = { muxerStarted = it },
+                    eos = true
+                )
             }
             if (muxerStarted) {
                 muxer.stop()
             }
+            muxer.release()
+            videoEncoder.release()
+            audioEncoderCodec?.release()
+            egl.release()
             progress(1.0f, "Export complete")
         } finally {
-            // Cleanup
+            // Best-effort cleanup if the try block failed before release.
+            try {
+                if (muxerStarted) muxer.stop()
+                muxer.release()
+            } catch (_: Exception) { }
         }
     }
 
@@ -178,6 +213,9 @@ class Mp4MediaCodecEncoder(
         muxer: MediaMuxer,
         isVideo: Boolean,
         trackIndexRef: () -> Int,
+        trackIndexSetter: (Int) -> Unit,
+        muxerStartedRef: () -> Boolean,
+        muxerStartedSetter: (Boolean) -> Unit,
         eos: Boolean = false
     ) {
         val info = MediaCodec.BufferInfo()
@@ -190,20 +228,11 @@ class Mp4MediaCodecEncoder(
                 }
                 idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     val newFormat = codec.outputFormat
-                    val trackIdx = if (isVideo) {
-                        muxer.addTrack(newFormat)
-                    } else {
-                        muxer.addTrack(newFormat)
-                    }
-                    if (isVideo) {
-                        // Sink for the outer scope to read.
-                        trackIndexRefFiller = trackIdx
-                    } else {
-                        trackIndexRefFiller = trackIdx
-                    }
-                    if (!muxerStarted) {
+                    val trackIdx = muxer.addTrack(newFormat)
+                    trackIndexSetter(trackIdx)
+                    if (!muxerStartedRef()) {
                         muxer.start()
-                        muxerStarted = true
+                        muxerStartedSetter(true)
                     }
                 }
                 idx >= 0 -> {
@@ -211,7 +240,7 @@ class Mp4MediaCodecEncoder(
                     if ((info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                         info.size = 0
                     }
-                    if (info.size > 0 && muxerStarted) {
+                    if (info.size > 0 && muxerStartedRef()) {
                         buf.position(info.offset)
                         buf.limit(info.offset + info.size)
                         val targetTrack = trackIndexRef()
@@ -232,101 +261,142 @@ class Mp4MediaCodecEncoder(
         // but this gives the rate-control a sane default.
         return ((width * height * fps) / 10).coerceAtLeast(400_000)
     }
-
-    // Tiny indirection so we can keep state local-without-mutating
-    // unchanging calls. Real codegen lives downstream.
-    private var trackIndexRefFiller: Int = -1
-    private val muxerStarted get() = false // placeholder; controls via field set in drain
-
-    /**
-     * Compose-side hook for the SceneRenderState source. Phase 5
-     * uses a single offline `AnimationSystem(WarehouseScene())` so
-     * we synthesise a placeholder state here until the export
-     * orchestrator (`ExportPipeline`) plumbs the real one in.
-     */
-    private fun eglCurrentFrameState(): SceneRenderState =
-        object : SceneRenderState {
-            override val widthPx = this@Mp4MediaCodecEncoder.widthPx
-            override val heightPx = this@Mp4MediaCodecEncoder.heightPx
-            override val pixels: ByteArray = ByteArray(0)
-            override val rowBytes = (widthPx + 7) / 8
-            override val tick = 0L
-        }
 }
 
 /**
- * Minimal EGL14 + GLES2 surface target for monochrome raster
- * rendering. Kept inline here to keep Phase 5 self-contained;
- * the real Compose → MediaCodec bridge wires through this.
+ * Minimal EGL14 + GLES2 surface target for monochrome 1-bit raster
+ * rendering from a [SceneRenderState] into a MediaCodec input Surface.
+ *
+ * Pipeline per frame:
+ *   1. Unpack the 1-bit MSB-first [SceneRenderState.pixels] into an
+ *      8-bit luminance buffer.
+ *   2. Upload to a GL_LUMINANCE texture (GLES 2.0 compatible, no
+ *      GL_RED requirement).
+ *   3. Draw a full-screen quad sampling that texture.
+ *   4. eglSwapBuffers to deliver the frame to MediaCodec.
  */
-private class EglRenderTarget(
+class EglRenderTarget(
     private val surface: android.view.Surface,
     private val width: Int,
     private val height: Int
 ) {
-    private var eglDisplay: android.opengl.EGLDisplay = android.opengl.EGL14.EGL_NO_DISPLAY
-    private var eglContext: android.opengl.EGLContext = android.opengl.EGL14.EGL_NO_CONTEXT
-    private var eglSurface: android.opengl.EGLSurface = android.opengl.EGL14.EGL_NO_SURFACE
+    private var eglDisplay: android.opengl.EGLDisplay = EGL14.EGL_NO_DISPLAY
+    private var eglContext: android.opengl.EGLContext = EGL14.EGL_NO_CONTEXT
+    private var eglSurface: android.opengl.EGLSurface = EGL14.EGL_NO_SURFACE
     private var program: Int = 0
     private var vertexBuffer: Int = 0
     private var texture: Int = 0
 
     fun setup() {
-        eglDisplay = android.opengl.EGL14.eglGetDisplay(android.opengl.EGL14.EGL_DEFAULT_DISPLAY)
-        android.opengl.EGL14.eglInitialize(eglDisplay, intArrayOf(0, 0), 0, intArrayOf(0, 0), 0)
+        eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
+        EGL14.eglInitialize(eglDisplay, intArrayOf(0, 0), 0, intArrayOf(0, 0), 0)
+
+        // Single valid eglChooseConfig call.
+        val configAttribs = intArrayOf(
+            EGL14.EGL_RED_SIZE, 8,
+            EGL14.EGL_GREEN_SIZE, 8,
+            EGL14.EGL_BLUE_SIZE, 8,
+            EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+            EGL14.EGL_RECORDABLE_ANDROID, 1,
+            EGL14.EGL_NONE
+        )
+        val configs = arrayOfNulls<android.opengl.EGLConfig>(1)
+        val numConfigs = intArrayOf(0)
+        EGL14.eglChooseConfig(eglDisplay, configAttribs, 0, configs, 0, 1, numConfigs, 0)
+        val config = configs[0]
+
         val ctxAttribs = intArrayOf(
-            android.opengl.EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,
-            android.opengl.EGL14.EGL_NONE
+            EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,
+            EGL14.EGL_NONE
         )
-        eglContext = android.opengl.EGL14.eglCreateContext(
-            eglDisplay,
-            eglDisplay.let { android.opengl.EGL14.eglChooseConfig(it, intArrayOf(
-                android.opengl.EGL14.EGL_RED_SIZE, 8,
-                android.opengl.EGL14.EGL_GREEN_SIZE, 8,
-                android.opengl.EGL14.EGL_BLUE_SIZE, 8,
-                android.opengl.EGL14.EGL_ALPHA_SIZE, 0,
-                android.opengl.EGL14.EGL_RENDERABLE_TYPE,
-                android.opengl.EGL14.EGL_OPENGL_ES2_BIT,
-                android.opengl.EGL14.EGL_NONE
-            ), null, 0, 1, intArrayOf(0), 0)[0] },
-            android.opengl.EGL14.EGL_NO_CONTEXT, ctxAttribs, 0
+        eglContext = EGL14.eglCreateContext(
+            eglDisplay, config,
+            EGL14.EGL_NO_CONTEXT, ctxAttribs, 0
         )
-        val surfAttribs = intArrayOf(android.opengl.EGL14.EGL_NONE)
-        eglSurface = android.opengl.EGL14.eglCreateWindowSurface(eglDisplay, eglDisplay.let {
-            android.opengl.EGL14.eglChooseConfig(it, intArrayOf(
-                android.opengl.EGL14.EGL_RENDERABLE_TYPE,
-                android.opengl.EGL14.EGL_OPENGL_ES2_BIT,
-                android.opengl.EGL14.EGL_NONE
-            ), null, 0, 1, intArrayOf(0), 0)[0]
-        }, surface, surfAttribs, 0)
-        android.opengl.EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)
+
+        val surfAttribs = intArrayOf(EGL14.EGL_NONE)
+        eglSurface = EGL14.eglCreateWindowSurface(eglDisplay, config, surface, surfAttribs, 0)
+        EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)
+
         program = compileProgram()
+
+        // Full-screen quad vertex buffer (two triangles covering [-1,1]×[-1,1]).
+        val vertices = floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)
+        val vbb = ByteBuffer.allocateDirect(vertices.size * 4)
+            .order(ByteOrder.nativeOrder())
+        val fbb = vbb.asFloatBuffer().apply { put(vertices); position(0) }
+
+        val buffers = intArrayOf(0)
+        GLES20.glGenBuffers(1, buffers, 0)
+        vertexBuffer = buffers[0]
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vertexBuffer)
+        GLES20.glBufferData(
+            GLES20.GL_ARRAY_BUFFER,
+            vertices.size * 4, fbb,
+            GLES20.GL_STATIC_DRAW
+        )
+
+        // Texture object for the 1-bit → luminance upload.
+        val textures = intArrayOf(0)
+        GLES20.glGenTextures(1, textures, 0)
+        texture = textures[0]
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texture)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
     }
 
-    fun drawSceneFrame(state: com.trashmuppet.pixelbeat.scene.api.SceneRenderState) {
-        // Clear to black, then write 1-bit pixels as black/white quad
-        // strips if `state.pixels` is non-empty. Phase 5 placeholder
-        // renders a black frame; Phase 6 plumbs the real state out.
-        android.opengl.GLES20.glViewport(0, 0, width, height)
-        android.opengl.GLES20.glClearColor(0f, 0f, 0f, 1f)
-        android.opengl.GLES20.glClear(android.opengl.GLES20.GL_COLOR_BUFFER_BIT)
-        if (state.pixels.isEmpty()) {
-            android.opengl.EGL14.eglSwapBuffers(eglDisplay, eglSurface)
-            return
+    fun drawSceneFrame(state: SceneRenderState) {
+        GLES20.glViewport(0, 0, width, height)
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+
+        if (state.pixels.isNotEmpty()) {
+            GLES20.glUseProgram(program)
+
+            // Unpack 1-bit MSB-first pixels → 8-bit luminance buffer.
+            val unpackData = ByteBuffer.allocateDirect(state.widthPx * state.heightPx)
+            for (y in 0 until state.heightPx) {
+                for (x in 0 until state.widthPx) {
+                    val byte = state.pixels[y * state.rowBytes + (x ushr 3)].toInt()
+                    val bit = (byte ushr (7 - (x and 7))) and 1
+                    unpackData.put((if (bit == 1) 0xFF.toByte() else 0x00.toByte()))
+                }
+            }
+            unpackData.position(0)
+
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texture)
+            GLES20.glPixelStorei(GLES20.GL_UNPACK_ALIGNMENT, 1)
+            GLES20.glTexImage2D(
+                GLES20.GL_TEXTURE_2D, 0, GLES20.GL_LUMINANCE,
+                state.widthPx, state.heightPx, 0, GLES20.GL_LUMINANCE,
+                GLES20.GL_UNSIGNED_BYTE, unpackData
+            )
+
+            val texLoc = GLES20.glGetUniformLocation(program, "u_tex")
+            GLES20.glUniform1i(texLoc, 0)
+
+            val posLoc = GLES20.glGetAttribLocation(program, "a_pos")
+            GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vertexBuffer)
+            GLES20.glEnableVertexAttribArray(posLoc)
+            GLES20.glVertexAttribPointer(posLoc, 2, GLES20.GL_FLOAT, false, 0, 0)
+
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+            GLES20.glDisableVertexAttribArray(posLoc)
         }
-        // Pack the 1-bit raster into a 1-channel red texture, draw a
-        // quad filling the viewport. (Real implementation lives in
-        // :scene-runtime Phase 6 — this stub writes the cleared
-        // framebuffer so callers can rely on phase progress.)
-        android.opengl.EGL14.eglSwapBuffers(eglDisplay, eglSurface)
+
+        EGL14.eglSwapBuffers(eglDisplay, eglSurface)
     }
 
     private fun compileProgram(): Int {
+        // Y-inverted UV so top-down pixel streams render upright.
         val vs = """
             attribute vec2 a_pos;
             varying vec2 v_uv;
             void main() {
-                v_uv = a_pos * 0.5 + 0.5;
+                v_uv = vec2(a_pos.x * 0.5 + 0.5, 0.5 - a_pos.y * 0.5);
                 gl_Position = vec4(a_pos, 0.0, 1.0);
             }
         """.trimIndent()
@@ -338,32 +408,31 @@ private class EglRenderTarget(
                 gl_FragColor = vec4(texture2D(u_tex, v_uv).rrr, 1.0);
             }
         """.trimIndent()
-        val v = compileShader(android.opengl.GLES20.GL_VERTEX_SHADER, vs)
-        val f = compileShader(android.opengl.GLES20.GL_FRAGMENT_SHADER, fs)
-        val p = android.opengl.GLES20.glCreateProgram()
-        android.opengl.GLES20.glAttachShader(p, v)
-        android.opengl.GLES20.glAttachShader(p, f)
-        android.opengl.GLES20.glLinkProgram(p)
+        val v = compileShader(GLES20.GL_VERTEX_SHADER, vs)
+        val f = compileShader(GLES20.GL_FRAGMENT_SHADER, fs)
+        val p = GLES20.glCreateProgram()
+        GLES20.glAttachShader(p, v)
+        GLES20.glAttachShader(p, f)
+        GLES20.glLinkProgram(p)
         return p
     }
 
     private fun compileShader(type: Int, source: String): Int {
-        val s = android.opengl.GLES20.glCreateShader(type)
-        android.opengl.GLES20.glShaderSource(s, source)
-        android.opengl.GLES20.glCompileShader(s)
+        val s = GLES20.glCreateShader(type)
+        GLES20.glShaderSource(s, source)
+        GLES20.glCompileShader(s)
         return s
     }
 
-    @Suppress("unused")
-    private fun release() {
-        if (eglDisplay != android.opengl.EGL14.EGL_NO_DISPLAY) {
-            android.opengl.EGL14.eglMakeCurrent(
-                eglDisplay, android.opengl.EGL14.EGL_NO_SURFACE,
-                android.opengl.EGL14.EGL_NO_SURFACE, android.opengl.EGL14.EGL_NO_CONTEXT
+    fun release() {
+        if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
+            EGL14.eglMakeCurrent(
+                eglDisplay, EGL14.EGL_NO_SURFACE,
+                EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT
             )
-            android.opengl.EGL14.eglDestroySurface(eglDisplay, eglSurface)
-            android.opengl.EGL14.eglDestroyContext(eglDisplay, eglContext)
-            android.opengl.EGL14.eglTerminate(eglDisplay)
+            EGL14.eglDestroySurface(eglDisplay, eglSurface)
+            EGL14.eglDestroyContext(eglDisplay, eglContext)
+            EGL14.eglTerminate(eglDisplay)
         }
     }
 }
