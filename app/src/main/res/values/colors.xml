@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        1-bit monochrome launcher palette per product identity.
+        Keep this file the single source of truth for the
+        @mipmap/ic_launcher background + foreground.
+    -->
+    <color name="mono_black">#FF000000</color>
+    <color name="mono_white">#FFFFFFFF</color>
+</resources>

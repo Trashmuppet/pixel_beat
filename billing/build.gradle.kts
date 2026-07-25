@@ -24,6 +24,14 @@ android {
 dependencies {
     implementation(project(":premium"))
 
-    implementation("com.android.billingclient:billing-ktx:7.0.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
+    // `EntitlementCache.markPro(value)` uses the
+    // `androidx.core.content.edit { putBoolean(...) }` extension
+    // function — the hardcoded `7.0.0` here used to be fine without
+    // core-ktx but the newer `GooglePlayPremiumManager` reads
+    // `prefs.edit()` extension calls into the cache path.
+    implementation(libs.androidx.core.ktx)
+
+    // Pin to the catalog so a Play ktx bump is single-source.
+    implementation(libs.play.billing.ktx)
+    implementation(libs.kotlinx.coroutines.android)
 }

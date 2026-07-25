@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Adaptive launcher icon (round). Same composition as the square
+    variant — Android's launcher masks it to a circle on API 26+ so
+    product identity stays consistent across launcher shapes.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/mono_black" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

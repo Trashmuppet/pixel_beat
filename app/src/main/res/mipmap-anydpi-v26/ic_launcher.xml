@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Adaptive launcher icon (square). API 26+ devices load this and
+    mask it to the launcher shape. Legacy devices fall through to
+    mipmap-anydpi/ic_launcher.xml.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/mono_black" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

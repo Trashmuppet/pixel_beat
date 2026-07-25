@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Adaptive-icon foreground. A pure 1-bit 30-unit diameter
+    white disc on a 108x108dp adaptive-icon canvas, sized to the
+    inner 72x72dp safe-zone so legacy launchers crop it cleanly.
+
+    Per product identity (Monochrome Beat), the foreground is the
+    only on-brand glyph: a single white hit. No colour, no gradient,
+    no decoration — anything else would betray the 1-bit motif.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="@color/mono_white"
+        android:pathData="M54,24 A30,30 0 1,1 53.999,24 Z" />
+</vector>

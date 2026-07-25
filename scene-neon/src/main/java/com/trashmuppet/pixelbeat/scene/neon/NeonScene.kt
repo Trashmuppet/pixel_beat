@@ -57,11 +57,15 @@ class NeonScene : Scene {
         trackShapes = trackIds.mapIndexed { idx, trackId ->
             val x = (rng.nextInt(WIDTH - 6) + idx) % (WIDTH - 4)
             val y = (rng.nextInt(HEIGHT - 6) + (idx * 3)) % (HEIGHT - 4)
-            val kind = project.patterns
+            // Resolve DrumKind (from :core:model) to the private
+            // TrackKindFallback enum so the local `toShape()` extension
+            // binds correctly. Without the explicit type annotation the
+            // elvis unifies `DrumKind?` with `TrackKindFallback` to `Any`,
+            // which hides the extension receiver.
+            val resolvedTrack = project.patterns
                 .flatMap { it.tracks }
                 .firstOrNull { it.id == trackId }
-                ?.kind
-                ?: TrackKindFallback.GENERIC
+            val kind: TrackKindFallback = resolveKindFallback(resolvedTrack)
             val shape = kind.toShape()
             trackId to TrackHit(anchorX = x, anchorY = y, shape = shape)
         }.toMap()
