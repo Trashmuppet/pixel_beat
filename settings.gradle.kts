@@ -49,6 +49,7 @@ include(":audio-native")
 include(":scene-api")
 include(":scene-runtime")
 include(":scene-warehouse")
+include(":scene-neon")
 
 // Phase 5 export pipeline (WAV / GIF / MP4 media encoders)
 include(":core:export")

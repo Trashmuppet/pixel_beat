@@ -28,7 +28,14 @@ object ScenePackRegistry {
             displayName = "Neon City",
             description = "Premium lights and visualizers.",
             requiresPro = true,
-            sceneFactory = { throw UnsupportedOperationException("Neon City scene not yet implemented") }
+            // Reflective instantiation keeps [:scene-api] decoupled from
+            // [:scene-neon]. Pro-gating via ProGate composable ensures
+            // this factory is only invoked when the user is entitled.
+            sceneFactory = {
+                Class.forName("com.trashmuppet.pixelbeat.scene.neon.NeonScene")
+                    .getDeclaredConstructor()
+                    .newInstance() as Scene
+            }
         ),
         ScenePack(
             packId = "void",

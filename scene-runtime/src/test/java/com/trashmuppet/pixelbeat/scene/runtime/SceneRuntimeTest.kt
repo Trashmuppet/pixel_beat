@@ -10,6 +10,7 @@ import com.trashmuppet.pixelbeat.core.model.ProjectSeed
 import com.trashmuppet.pixelbeat.core.model.SwingMode
 import com.trashmuppet.pixelbeat.core.model.Track
 import com.trashmuppet.pixelbeat.scene.warehouse.WarehouseScene
+import com.trashmuppet.pixelbeat.scene.neon.NeonScene
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -104,6 +105,31 @@ class SceneRuntimeTest {
             sim.enqueueHit(HitEvent(tick = 400,   trackId = "blank/snare"))
             sim.enqueueHit(HitEvent(tick = 600,   trackId = "blank/hat"))
             sim.enqueueHit(HitEvent(tick = 800,   trackId = "blank/kick"))
+            sim.advance(audioFrames = 1000, audioSampleRate = 48_000)
+        }
+
+    @Test
+    fun `NeonScene is byte-deterministic across runs`() {
+        val project = fixture()
+        val stateA = runNeonOnce(project)
+        val stateB = runNeonOnce(project)
+        assertArrayEquals(
+            stateA.pixels, stateB.pixels,
+            "Two equal NeonScene runs must produce identical pixel arrays"
+        )
+        assertEquals(stateA.tick, stateB.tick, "tick counters must match")
+        assertTrue(
+            stateA.pixels.any { byte -> (0..7).any { ((byte.toInt() ushr (7 - it)) and 1) == 1 } },
+            "NeonScene background or hit shapes should render at least one lit pixel"
+        )
+    }
+
+    private fun runNeonOnce(project: MBeatProject): SceneRenderState =
+        NeonScene().apply { load(project) }.let { scene ->
+            val sim = AnimationSystem(scene)
+            sim.enqueueHit(HitEvent(tick = 200, trackId = "blank/kick"))
+            sim.enqueueHit(HitEvent(tick = 400, trackId = "blank/snare"))
+            sim.enqueueHit(HitEvent(tick = 600, trackId = "blank/hat"))
             sim.advance(audioFrames = 1000, audioSampleRate = 48_000)
         }
 

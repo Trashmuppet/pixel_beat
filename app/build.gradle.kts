@@ -155,6 +155,7 @@ dependencies {
     implementation(project(":audio-native"))
     implementation(project(":scene-runtime"))
     implementation(project(":scene-warehouse"))
+    implementation(project(":scene-neon"))
 
     // Features.
     implementation(project(":feature-home"))
