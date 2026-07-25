@@ -39,6 +39,9 @@ include(":core:model")
 include(":core:timeline")
 include(":core:common")
 
+// Cross-cutting reusable Compose components (Phase 3).
+include(":core:ui")
+
 // Native C++ audio engine (real-time only — no UI / storage access)
 include(":audio-native")
 

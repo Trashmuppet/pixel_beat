@@ -1,22 +1,45 @@
 {
-  "version": 1,
-  "schema": "mbeat-v1",
-  "projectId": "sample",
+  "id": "sample",
   "name": "Warehouse Groove",
-  "bpm": 120,
-  "swing": 0.0,
-  "tracks": [
+  "version": 2,
+  "schema": "mbeat-v2",
+  "bpm": 120.0,
+  "seed": 1730995200,
+  "swing": { "granularity": "eighth", "amount": 0.0 },
+  "arrangement": {
+    "patternChain": ["main"],
+    "loopBars": { "startBar": 0, "endBar": 0 }
+  },
+  "patterns": [
     {
-      "id": "kick",
-      "steps": [0, 4, 8, 12]
-    },
-    {
-      "id": "snare",
-      "steps": [4, 12]
-    },
-    {
-      "id": "hat",
-      "steps": [0, 2, 4, 6, 8, 10, 12, 14]
+      "id": "main",
+      "lengthSteps": 16,
+      "tracks": [
+        {
+          "id": "kick",
+          "kind": "kick",
+          "steps": [true,false,false,false,true,false,false,false,true,false,false,false,true,false,false,false],
+          "volumeDb": 0.0,
+          "panCb": 0.0,
+          "mute": false
+        },
+        {
+          "id": "snare",
+          "kind": "snare",
+          "steps": [false,false,false,false,true,false,false,false,false,false,false,false,true,false,false,false],
+          "volumeDb": -2.0,
+          "panCb": 0.0,
+          "mute": false
+        },
+        {
+          "id": "hat",
+          "kind": "closed_hat",
+          "steps": [true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],
+          "volumeDb": -6.0,
+          "panCb": 10.0,
+          "mute": false
+        }
+      ]
     }
   ]
 }
