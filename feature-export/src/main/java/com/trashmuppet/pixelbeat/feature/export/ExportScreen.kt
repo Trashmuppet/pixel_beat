@@ -2,7 +2,6 @@ package com.trashmuppet.pixelbeat.feature.export
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -157,13 +156,4 @@ fun ExportScreen(
     }
 }
 
-// Backward-compatible stub.
-@Composable
-fun ExportScreen(
-    onFinished: () -> Unit,
-    onBack: () -> Unit
-) {
-    Box(modifier = Modifier.fillMaxSize().background(MonoPalette.Background)) {
-        Text("…", color = MonoPalette.Foreground)
-    }
-}
+

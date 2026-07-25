@@ -3,7 +3,6 @@ package com.trashmuppet.pixelbeat.feature.sequencer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.CreationExtras
 import com.trashmuppet.pixelbeat.core.common.AppDispatchers
 import com.trashmuppet.pixelbeat.core.common.Result
 import com.trashmuppet.pixelbeat.core.model.Arrangement
@@ -15,10 +14,19 @@ import com.trashmuppet.pixelbeat.core.model.ProjectSeed
 import com.trashmuppet.pixelbeat.core.model.SwingMode
 import com.trashmuppet.pixelbeat.core.model.Track
 import com.trashmuppet.pixelbeat.core.timeline.RealtimeTransport
+import com.trashmuppet.pixelbeat.core.timeline.TimelineCompiler
 import com.trashmuppet.pixelbeat.storage.ProjectRepository
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -28,6 +36,9 @@ import kotlinx.coroutines.launch
  * `project == null && isLoading == true` ⇒ initial load.
  * `project == null && error != null`     ⇒ load failed.
  * `project != null`                      ⇒ editing session ready.
+ *
+ * `playheadStep` is **derived** from [RealtimeTransport.positionFlow]
+ * per ADR-001 — the UI never maintains its own tick counter.
  */
 data class SequencerState(
     val project: MBeatProject? = null,
@@ -44,20 +55,46 @@ data class SequencerState(
 /**
  * Editor for one pattern in a project. Mutations apply to the
  * `MBeatProject` in memory and (debounced) through `ProjectRepository`.
- * Playback is delegated to `RealtimeTransport`; the VM never owns the
- * audio callback per ADR-001 (timeline is the authoritative time).
+ *
+ * Per ADR-001 the transport owns sample-accurate timing. This VM
+ * subscribes to `transport.positionFlow()` and projects the sample
+ * position into a step index for the playhead UI.
  */
+@OptIn(FlowPreview::class)
 class SequencerViewModel(
     private val dispatchers: AppDispatchers,
     private val repository: ProjectRepository,
     private val transport: RealtimeTransport,
+    private val compiler: TimelineCompiler = TimelineCompiler(),
     initialProjectId: String?
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SequencerState())
     val state: StateFlow<SequencerState> = _state.asStateFlow()
 
-    init { loadIfNeeded(initialProjectId) }
+    /**
+     * Plays the project through the realtime transport. Per ADR-001 the
+     * transport owns time; we just compile the timeline and start it.
+     * Cancelling [playJob] effectively pauses playback.
+     */
+    private var playJob: Job? = null
+
+    init {
+        loadIfNeeded(initialProjectId)
+        // Debounce save commits so a fast step-toggle burst doesn't
+        // produce a serialised save per keystroke.
+        viewModelScope.launch(dispatchers.io) {
+            _state
+                .map { it.project }
+                .distinctUntilChanged()
+                .debounce(SAVE_DEBOUNCE_MS)
+                .collectLatest { project ->
+                    if (project != null) {
+                        repository.save(project)
+                    }
+                }
+        }
+    }
 
     private fun loadIfNeeded(id: String?) {
         val projectId = id ?: NEW_PROJECT_ID
@@ -67,7 +104,6 @@ class SequencerViewModel(
                     it.copy(project = outcome.value, isLoading = false, error = null)
                 }
                 is Result.Failure -> {
-                    // Brand-new session: create an empty project and edit from there.
                     val blank = blankProject(projectId)
                     _state.update {
                         it.copy(
@@ -100,7 +136,6 @@ class SequencerViewModel(
             )
             current.copy(project = newProject)
         }
-        commitDebounced()
     }
 
     fun toggleMute(trackId: String) {
@@ -117,7 +152,6 @@ class SequencerViewModel(
             )
             current.copy(project = newProject)
         }
-        commitDebounced()
     }
 
     fun setBpm(bpm: Float) {
@@ -125,7 +159,6 @@ class SequencerViewModel(
             val project = current.project ?: return@update current
             current.copy(project = project.copy(bpm = bpm.coerceIn(30f, 300f)))
         }
-        commitDebounced()
     }
 
     fun setSwing(swing: SwingMode) {
@@ -133,30 +166,57 @@ class SequencerViewModel(
             val project = current.project ?: return@update current
             current.copy(project = project.copy(swing = swing))
         }
-        commitDebounced()
     }
 
     fun selectPattern(index: Int) {
         _state.update { current ->
             val project = current.project ?: return@update current
             val safeIndex = index.coerceIn(0, project.patterns.size - 1)
-            current.copy(currentPatternIndex = safeIndex, playheadStep = 0)
+            current.copy(currentPatternIndex = safeIndex)
         }
     }
 
+    /**
+     * Compile the project and start realtime playback. Per ADR-001 the
+     * transport owns time; we just hand it the [CompiledTimeline] and
+     * subscribe the step-derive collector to positionFlow().
+     */
     fun play() {
         val project = _state.value.project ?: return
+        val timeline = compiler.compile(project)
+        transport.start(timeline)
         _state.update { it.copy(isPlaying = true) }
-        transport.setProject(project)
-        // Replaying happens via transport.start(timeline); a real wire-up
-        // compiles the timeline here. Reserved for Phase 5 export wiring.
+        // Drive the playhead step counter from the transport's
+        // sample-accurate position flow. Single source of truth.
+        val sampleRate = timeline.internalSampleRate.toFloat()
+        val baseBeatSeconds = 60f / project.bpm.coerceAtLeast(1f)
+        val sixteenthNoteSamples = (sampleRate * baseBeatSeconds / 4f).coerceAtLeast(1f)
+        val totalSteps = project.patterns.firstOrNull()?.lengthSteps ?: 16
+        playJob?.cancel()
+        playJob = viewModelScope.launch(dispatchers.default) {
+            transport.positionFlow().collect { samplePosition ->
+                if (samplePosition < 0) return@collect
+                val stepIndex = (samplePosition / sixteenthNoteSamples)
+                    .toInt()
+                    .mod(totalSteps)
+                _state.update { it.copy(playheadStep = stepIndex) }
+            }
+        }
     }
 
+    /**
+     * Stop realtime playback. Per ADR-001 the transport stays the
+     * authoritative clock — we just stop it. UI keeps its last
+     * playheadStep so the user can resume cleanly.
+     */
     fun pause() {
-        _state.update { it.copy(isPlaying = false) }
+        playJob?.cancel()
+        playJob = null
         transport.stop()
+        _state.update { it.copy(isPlaying = false) }
     }
 
+    /** Force an immediate save (used on BackHandler, scene-change, etc.). */
     fun commit() {
         val project = _state.value.project ?: return
         viewModelScope.launch(dispatchers.io) {
@@ -164,13 +224,6 @@ class SequencerViewModel(
                 _state.update { it.copy(error = "Save failed: ${err.message}") }
             }
         }
-    }
-
-    private fun commitDebounced() {
-        // Phase 0 simplification: shortcut to debounce. Real Phase 6
-        // implementation collects state updates through a conflated
-        // Flow + .debounce(800) before calling commit().
-        commit()
     }
 
     private fun blankProject(projectId: String): MBeatProject {
@@ -204,15 +257,26 @@ class SequencerViewModel(
 
     companion object {
         private const val NEW_PROJECT_ID = "new"
+        private const val SAVE_DEBOUNCE_MS = 800L
+
+        // SharingStarted.Eagerly so the player sees isPlaying = true on first paint.
+        private val playStarted = SharingStarted.Eagerly
 
         fun factory(dispatchers: AppDispatchers,
                     repository: ProjectRepository,
                     transport: RealtimeTransport,
+                    compiler: TimelineCompiler = TimelineCompiler(),
                     initialProjectId: String?): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    SequencerViewModel(dispatchers, repository, transport, initialProjectId) as T
+                    SequencerViewModel(
+                        dispatchers,
+                        repository,
+                        transport,
+                        compiler,
+                        initialProjectId
+                    ) as T
             }
     }
 }

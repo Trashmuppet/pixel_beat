@@ -14,8 +14,10 @@ import com.trashmuppet.pixelbeat.feature.export.MediaExporter
 import com.trashmuppet.pixelbeat.premium.PremiumManager
 import com.trashmuppet.pixelbeat.scene.runtime.AnimationSystem
 import com.trashmuppet.pixelbeat.scene.warehouse.WarehouseScene
+import com.trashmuppet.pixelbeat.storage.CachingProjectRepository
 import com.trashmuppet.pixelbeat.storage.ProjectRepository
 import com.trashmuppet.pixelbeat.storage.StorageProjectRepository
+import com.trashmuppet.pixelbeat.storage.cache.StorageDatabase
 
 /**
  * Application-scoped dependency container (Phase 3 wiring).
@@ -28,8 +30,12 @@ import com.trashmuppet.pixelbeat.storage.StorageProjectRepository
  */
 class AppDependencies(applicationContext: Context) {
     val dispatchers: AppDispatchers = DefaultAppDispatchers()
-    val projectRepository: ProjectRepository =
+    private val rawRepository: ProjectRepository =
         StorageProjectRepository(applicationContext, dispatchers)
+    /** File-system backed `.mbeat` repo wrapped with the rebuildable Room cache
+     *  per `docs/14_STORAGE.md`. Feature modules see this interface only. */
+    val projectRepository: ProjectRepository =
+        CachingProjectRepository.wrap(rawRepository, StorageDatabase.build(applicationContext))
     val transport: RealtimeTransport = TestRealtimeTransport()
 
     /** Phase 5 audio source. Streams `renderOffline(float[s])` from the engine. */

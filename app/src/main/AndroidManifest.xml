@@ -5,7 +5,15 @@
         Monochrome Beat is offline-first. We deliberately do not declare
         android.permission.INTERNET — staying compliant with the
         "no cloud, no telemetry, no API keys" product pillars.
+
+        WRITE_EXTERNAL_STORAGE is gated to API ≤ 28 because the export
+        pipeline writes to `getExternalFilesDir()` on legacy devices.
+        Modern (API 29+) targets use scoped storage and never need the
+        permission. Permission matrix lives in docs/06_NAVIGATION_AND_STATE.md.
     -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <application
         android:name=".MonochromeBeatApp"

@@ -3,7 +3,6 @@ package com.trashmuppet.pixelbeat.feature.arrangement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
@@ -73,7 +71,6 @@ fun ArrangementScreen(
                 state.patternChain.forEachIndexed { index, patternId ->
                     ArrangementSlot(
                         index = index,
-                        total = state.patternChain.size,
                         label = patternId,
                         onMoveUp = if (index > 0) ({ viewModel.reorderPattern(index, index - 1) }) else null,
                         onMoveDown = if (index < state.patternChain.size - 1) ({ viewModel.reorderPattern(index, index + 1) }) else null,
@@ -134,7 +131,6 @@ fun ArrangementScreen(
 @Composable
 private fun ArrangementSlot(
     index: Int,
-    total: Int,
     label: String,
     onMoveUp: (() -> Unit)?,
     onMoveDown: (() -> Unit)?,
@@ -156,10 +152,14 @@ private fun ArrangementSlot(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("$index $label")
-            Box(modifier = Modifier.sizeIn(minWidth = 36.dp, minHeight = 36.dp)) {}
+            Text(
+                "$index $label",
+                modifier = Modifier.weight(1f),
+                color = MonoPalette.Foreground
+            )
             Text(
                 "↑",
+                color = MonoPalette.Foreground,
                 modifier = Modifier
                     .sizeIn(minWidth = 36.dp, minHeight = 36.dp)
                     .clickable(enabled = onMoveUp != null) {
@@ -186,17 +186,5 @@ private fun ArrangementSlot(
                     }
             )
         }
-    }
-    @Suppress("UNUSED_VARIABLE") val unused = total
-}
-
-// Backward-compatible stub.
-@Composable
-fun ArrangementScreen(
-    onContinueToExport: () -> Unit,
-    onBack: () -> Unit
-) {
-    Box(modifier = Modifier.fillMaxSize().background(MonoPalette.Background)) {
-        Text("…", color = MonoPalette.Foreground)
     }
 }

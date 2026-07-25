@@ -2,7 +2,9 @@ package com.trashmuppet.pixelbeat.feature.project
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.Button
@@ -42,7 +44,8 @@ fun ProjectScreen(
     repository: ProjectRepository,
     dispatchers: AppDispatchers = DefaultAppDispatchers(),
     onProjectSelected: (MBeatProject) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSettings: (() -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -78,29 +81,37 @@ fun ProjectScreen(
             RecentProjectList(projects = recent, onSelect = onProjectSelected)
         }
 
-        Button(
-            onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onBack()
-            },
-            modifier = Modifier.sizeIn(minHeight = TapTarget),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MonoPalette.Background,
-                contentColor = MonoPalette.Foreground
-            )
-        ) { Text("Back") }
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onBack()
+                },
+                modifier = Modifier.sizeIn(minHeight = TapTarget),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MonoPalette.Background,
+                    contentColor = MonoPalette.Foreground
+                )
+            ) { Text("Back") }
+            if (onSettings != null) {
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onSettings()
+                    },
+                    modifier = Modifier.sizeIn(minHeight = TapTarget),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MonoPalette.Background,
+                        contentColor = MonoPalette.Foreground
+                    )
+                ) { Text("Settings") }
+            }
+        }
     }
-}
-
-// Older signature kept for AppNavHost backward compatibility.
-@Composable
-fun ProjectScreen(
-    onProjectSelected: () -> Unit,
-    onBack: () -> Unit
-) {
-    Text(
-        text = "ProjectScreen: open the sample fixture.",
-        color = MonoPalette.Foreground,
-        modifier = Modifier.padding(top = 16.dp)
-    )
 }

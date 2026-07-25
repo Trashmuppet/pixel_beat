@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import com.trashmuppet.pixelbeat.core.model.MBeatProject
-import com.trashmuppet.pixelbeat.core.ui.ExportProgressBar
 import com.trashmuppet.pixelbeat.core.ui.MonoPalette
 import com.trashmuppet.pixelbeat.core.ui.ProGate
 import com.trashmuppet.pixelbeat.core.ui.ProjectCard
@@ -126,9 +125,5 @@ fun HomeScreen(
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-
-        // Keep the export progress bar import path live so
-        // children of HomeScreen never silently drop the symbol.
-        ExportProgressBar(progress = 0f, statusLine = "")
     }
 }

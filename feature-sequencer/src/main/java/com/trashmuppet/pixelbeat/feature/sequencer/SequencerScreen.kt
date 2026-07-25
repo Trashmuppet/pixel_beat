@@ -2,7 +2,6 @@ package com.trashmuppet.pixelbeat.feature.sequencer
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -151,16 +150,4 @@ fun SequencerScreen(
     }
 }
 
-// Backward-compatible legacy entry-point used by `AppNavHost` when no
-// VM is wired. Returns the same visual layout as the live VM-driven
-// screen with a blank in-memory state.
-@Composable
-fun SequencerScreen(
-    onContinueToArrangement: () -> Unit,
-    onBack: () -> Unit
-) {
-    Box(modifier = Modifier.fillMaxSize().background(MonoPalette.Background)) {
-        Text("…", color = MonoPalette.Foreground)
-    }
-    // No-op shim — VM-backed form is the canonical entry.
-}
+

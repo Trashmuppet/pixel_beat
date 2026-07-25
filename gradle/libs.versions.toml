@@ -19,6 +19,9 @@ coreKtx = "1.15.0"
 # Monetisation
 playBilling = "7.1.1"
 
+# Room (rebuildable recent-projects cache per docs/14_STORAGE.md)
+room = "2.6.1"
+
 [libraries]
 # Kotlinx
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -45,6 +48,11 @@ androidx-navigation-compose = { module = "androidx.navigation:navigation-compose
 
 # Google Play Billing
 play-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "playBilling" }
+
+# Room (storage cache layer)
+androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

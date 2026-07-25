@@ -70,13 +70,8 @@ class ExportViewModel(
                     outputFile = outputFile,
                     format = current.format,
                     resolution = current.resolution,
-                    onProgress = { progress, status ->
-                        // Suspends until UI acks via state collection.
-                    }
+                    onProgress = ::publishProgress
                 )
-                // Drive progress through internal mutable updates as the
-                // exporter reports; for the Phase 5 implementation we
-                // simply trust the exporter's onProgress to push state.
                 _state.value = ExportState.Success(outputFile.absolutePath)
             } catch (t: Throwable) {
                 _state.value = ExportState.Error(t)
@@ -92,9 +87,34 @@ class ExportViewModel(
         _state.value = ExportState.Rendering(progress = progress.coerceIn(0f, 1f), statusLine = statusLine)
     }
 
+    /**
+     * Reload the current project from disk. The previous
+     * implementation called `load(null)` twice (with a dead `load(false)`),
+     * which always constructed a fresh blank project. Fix: invoke
+     * `load(currentId)` so a coroutine-cancelled export leaves the
+     * editor in a deterministic state.
+     */
     fun reset() {
-        load(_state.value.toString().takeIf { false })  // no-op: just re-load
-        load(null)
+        val currentId = currentProjectId()
+        // Force a fresh load: pass null then the discovered id so we
+        // skip any in-memory `_state` cached value.
+        viewModelScope.launch(dispatchers.io) {
+            _state.value = ExportState.Idle
+            when (val outcome = repository.load(currentId ?: "sample")) {
+                is Result.Success -> _state.value = ExportState.Configuring(
+                    project = outcome.value,
+                    format = ExportFormat.WAV,
+                    resolution = ExportResolution.SD_480
+                )
+                is Result.Failure -> _state.value = ExportState.Error(outcome.error)
+            }
+        }
+    }
+
+    /** The id of the project the ViewModel is currently editing. */
+    private fun currentProjectId(): String? = when (val s = _state.value) {
+        is ExportState.Configuring -> s.project.id
+        else -> null
     }
 
     companion object {
