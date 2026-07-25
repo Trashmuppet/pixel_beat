@@ -46,7 +46,7 @@ object ScenePackRegistry {
             // [:scene-void]. Pro-gating via ProGate composable ensures
             // this factory is only invoked when the user is entitled.
             sceneFactory = {
-                Class.forName("com.trashmuppet.pixelbeat.scene.void.VoidScene")
+                Class.forName("com.trashmuppet.pixelbeat.scene.darkvoid.VoidScene")
                     .getDeclaredConstructor()
                     .newInstance() as Scene
             }

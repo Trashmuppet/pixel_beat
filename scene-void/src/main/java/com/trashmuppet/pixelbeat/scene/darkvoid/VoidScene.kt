@@ -1,4 +1,4 @@
-package com.trashmuppet.pixelbeat.scene.void
+package com.trashmuppet.pixelbeat.scene.darkvoid
 
 import com.trashmuppet.pixelbeat.core.model.HitEvent
 import com.trashmuppet.pixelbeat.core.model.MBeatProject

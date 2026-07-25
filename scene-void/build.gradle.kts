@@ -16,7 +16,7 @@ plugins {
 }
 
 android {
-    namespace = "com.trashmuppet.pixelbeat.scene.void"
+    namespace = "com.trashmuppet.pixelbeat.scene.darkvoid"
     compileSdk = 36
 
     defaultConfig {
