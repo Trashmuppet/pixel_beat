@@ -2,6 +2,7 @@ package com.trashmuppet.pixelbeat
 
 import android.content.Context
 import com.trashmuppet.pixelbeat.audio.AudioEngine
+import com.trashmuppet.pixelbeat.billing.GooglePlayPremiumManager
 import com.trashmuppet.pixelbeat.core.common.AppDispatchers
 import com.trashmuppet.pixelbeat.core.common.DefaultAppDispatchers
 import com.trashmuppet.pixelbeat.core.export.AudioFramesSource
@@ -10,6 +11,7 @@ import com.trashmuppet.pixelbeat.core.export.ExportPipeline
 import com.trashmuppet.pixelbeat.core.timeline.RealtimeTransport
 import com.trashmuppet.pixelbeat.core.timeline.TestRealtimeTransport
 import com.trashmuppet.pixelbeat.feature.export.MediaExporter
+import com.trashmuppet.pixelbeat.premium.PremiumManager
 import com.trashmuppet.pixelbeat.scene.runtime.AnimationSystem
 import com.trashmuppet.pixelbeat.scene.warehouse.WarehouseScene
 import com.trashmuppet.pixelbeat.storage.ProjectRepository
@@ -41,4 +43,7 @@ class AppDependencies(applicationContext: Context) {
 
     /** Phase 5 `MediaExporter` — backed by the real Wav/Gif/Mp4 encoders. */
     val exporter: MediaExporter = CompatibilityExporter(exportPipeline)
+
+    /** Phase 7 billing manager. Cold-start cache delivered immediately; Play query async. */
+    val premiumManager: PremiumManager = GooglePlayPremiumManager(applicationContext)
 }

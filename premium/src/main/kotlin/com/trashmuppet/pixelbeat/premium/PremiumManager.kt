@@ -1,44 +1,32 @@
 package com.trashmuppet.pixelbeat.premium
 
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The single source of truth for "is this user Pro?" that UI features
- * depend on. Per `15_BILLING.md`:
- *  - Project files MUST never depend on entitlement state.
- *  - Core beat creation remains free.
- *  - The offline entitlement cache is honoured here.
+ * Abstraction over the billing backend.
  *
- * Features query via `observe()`; the implementation in `:billing`
- * hydrates from Play Billing + the on-device cache.
+ * Feature modules depend on this interface, never on the Google Play
+ * Billing implementation in [:billing]. Per [15_BILLING.md]:
+ *
+ * ```
+ * feature modules → PremiumManager → billing module → Google Play Billing
+ * ```
+ *
+ * [entitlementState] emits the current entitlement. On cold start it
+ * returns the cached value immediately (FAST path), then
+ * [refreshEntitlement] updates the cache from Play in the background.
  */
 interface PremiumManager {
+    /** Cold-start cached value, updated asynchronously by [refreshEntitlement]. */
+    val entitlementState: StateFlow<PremiumState>
 
-    fun observe(): Flow<ProState>
-
-    /** Synchronous "do they have pro right now" — used by export gating. */
-    fun isPro(): Boolean
-
-    /** Force-rehydrate from Play after a successful purchase. */
-    suspend fun refresh()
-}
-
-enum class ProState {
-    /** Core beat creation is always free, so non-Pro is a valid state. */
-    Free,
-
-    /** Pro is unlocked via the £1.99 one-time purchase. */
-    Pro
-}
-
-/**
- * Default Phase 0 implementation — Free. The real `PremiumManager`
- * (Play Billing + offline entitlement cache) lands in Phase 0's billing
- * stage.
- */
-class FreePremiumManager : PremiumManager {
-    override fun observe(): Flow<ProState> = flowOf(ProState.Free)
-    override fun isPro(): Boolean = false
-    override suspend fun refresh() = Unit
+    /**
+     * Query the billing backend for the latest entitlement.
+     * Implementations should:
+     *  1. Set [entitlementState] to [PremiumState.Pending] if not Pro.
+     *  2. Query Play (or equivalent).
+     *  3. Update the offline cache and [entitlementState].
+     *  4. Fall back to the cached value on network / service errors.
+     */
+    suspend fun refreshEntitlement()
 }

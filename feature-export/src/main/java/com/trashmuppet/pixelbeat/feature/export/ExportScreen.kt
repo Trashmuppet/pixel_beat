@@ -30,6 +30,7 @@ import com.trashmuppet.pixelbeat.core.ui.ChipRow
 import com.trashmuppet.pixelbeat.core.ui.ExportProgressBar
 import com.trashmuppet.pixelbeat.core.ui.MonoPalette
 import com.trashmuppet.pixelbeat.core.ui.TapTarget
+import com.trashmuppet.pixelbeat.premium.PremiumState
 import java.io.File
 
 @Composable
@@ -41,6 +42,8 @@ fun ExportScreen(
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
     val state: ExportState by viewModel.state.collectAsStateWithLifecycle()
+    val premiumState by viewModel.premiumManager.entitlementState.collectAsStateWithLifecycle()
+    val isPro = premiumState is PremiumState.Pro
 
     Column(
         modifier = Modifier
@@ -70,13 +73,21 @@ fun ExportScreen(
                     onSelect = { viewModel.selectFormat(it) }
                 )
                 if (s.format.isVideo) {
+                    val allowedResolutions = ExportResolution.entries.filter { !it.requiresPro || isPro }
                     ChipRow(
-                        options = ExportResolution.entries.toList(),
+                        options = allowedResolutions,
                         selected = s.resolution,
                         label = { "${it.width}×${it.height}" },
                         contentDesc = { "Resolution ${it.width} by ${it.height}" },
                         onSelect = { viewModel.selectResolution(it) }
                     )
+                    if (!isPro) {
+                        Text(
+                            "FHD/4K available with Pro",
+                            color = MonoPalette.Foreground,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
                 Button(
                     onClick = {

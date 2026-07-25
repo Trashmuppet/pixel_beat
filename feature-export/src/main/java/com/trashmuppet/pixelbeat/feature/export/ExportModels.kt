@@ -22,9 +22,13 @@ enum class ExportFormat(val extension: String) {
 enum class ExportResolution(val width: Int, val height: Int) {
     SD_480(854, 480),
     HD_720(1280, 720),
-    FHD_1080(1920, 1080);
+    FHD_1080(1920, 1080),
+    UHD_4K(3840, 2160);
 
-    val isExportableToGif: Boolean get() = true
+    val isExportableToGif: Boolean get() = this != UHD_4K
+
+    /** Resolutions that require Pro entitlement. */
+    val requiresPro: Boolean get() = this == FHD_1080 || this == UHD_4K
 }
 
 /**

@@ -90,6 +90,7 @@ fun AppNavHost(deps: AppDependencies) {
                     dispatchers = deps.dispatchers,
                     repository = deps.projectRepository,
                     exporter = deps.exporter,
+                    premiumManager = deps.premiumManager,
                     initialProjectId = null
                 )
             )

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.trashmuppet.pixelbeat.core.common.AppDispatchers
 import com.trashmuppet.pixelbeat.core.common.Result
 import com.trashmuppet.pixelbeat.core.model.MBeatProject
+import com.trashmuppet.pixelbeat.premium.PremiumManager
 import com.trashmuppet.pixelbeat.storage.ProjectRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +19,7 @@ class ExportViewModel(
     private val dispatchers: AppDispatchers,
     private val repository: ProjectRepository,
     private val exporter: MediaExporter,
+    val premiumManager: PremiumManager,
     initialProjectId: String?
 ) : ViewModel() {
 
@@ -99,11 +101,12 @@ class ExportViewModel(
         fun factory(dispatchers: AppDispatchers,
                     repository: ProjectRepository,
                     exporter: MediaExporter,
+                    premiumManager: PremiumManager,
                     initialProjectId: String?): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    ExportViewModel(dispatchers, repository, exporter, initialProjectId) as T
+                    ExportViewModel(dispatchers, repository, exporter, premiumManager, initialProjectId) as T
             }
     }
 }
