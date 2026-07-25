@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -405,5 +406,64 @@ fun ExportProgressBar(
             trackColor = MonoPalette.Background
         )
         Text(statusLine, color = MonoPalette.Foreground, fontSize = 12.sp)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pro gating
+// ---------------------------------------------------------------------------
+
+/**
+ * Wraps [content] in a Pro entitlement gate.
+ *
+ * When [requiresPro] and the user is not Pro: renders [content] dimmed
+ * with a lock overlay and an "Unlock Pro" button. Otherwise renders
+ * [content] without modification.
+ */
+@Composable
+fun ProGate(
+    requiresPro: Boolean,
+    isPro: Boolean,
+    onUnlockClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    if (requiresPro && !isPro) {
+        val haptic = LocalHapticFeedback.current
+        Box(
+            modifier = modifier.semantics(mergeDescendants = true) {
+                contentDescription = "Pro Required"
+            }
+        ) {
+            Box(modifier = Modifier.alpha(0.3f)) {
+                content()
+            }
+            Box(
+                modifier = Modifier.matchParentSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Pro Required", color = MonoPalette.Foreground, fontSize = 14.sp)
+                    Button(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onUnlockClick()
+                        },
+                        modifier = Modifier.sizeIn(minHeight = TapTarget),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MonoPalette.Foreground,
+                            contentColor = MonoPalette.Background
+                        )
+                    ) {
+                        Text("Unlock Pro")
+                    }
+                }
+            }
+        }
+    } else {
+        content()
     }
 }

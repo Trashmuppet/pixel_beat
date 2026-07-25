@@ -44,6 +44,10 @@ class AppDependencies(applicationContext: Context) {
     /** Phase 5 `MediaExporter` — backed by the real Wav/Gif/Mp4 encoders. */
     val exporter: MediaExporter = CompatibilityExporter(exportPipeline)
 
-    /** Phase 7 billing manager. Cold-start cache delivered immediately; Play query async. */
-    val premiumManager: PremiumManager = GooglePlayPremiumManager(applicationContext)
+    /** Phase 7 billing manager. Cold-start cache delivered immediately; Play query async.
+     *  Debug builds bypass Play Billing entirely — always returns Pro. */
+    val premiumManager: PremiumManager = GooglePlayPremiumManager(
+        applicationContext,
+        debugBypass = BuildConfig.DEBUG
+    )
 }

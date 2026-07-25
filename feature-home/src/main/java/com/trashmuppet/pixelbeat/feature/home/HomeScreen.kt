@@ -1,9 +1,13 @@
 package com.trashmuppet.pixelbeat.feature.home
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
@@ -21,8 +25,10 @@ import androidx.compose.ui.semantics.testTag
 import com.trashmuppet.pixelbeat.core.model.MBeatProject
 import com.trashmuppet.pixelbeat.core.ui.ExportProgressBar
 import com.trashmuppet.pixelbeat.core.ui.MonoPalette
+import com.trashmuppet.pixelbeat.core.ui.ProGate
 import com.trashmuppet.pixelbeat.core.ui.ProjectCard
 import com.trashmuppet.pixelbeat.core.ui.TapTarget
+import com.trashmuppet.pixelbeat.scene.api.ScenePack
 
 /**
  * Home destination — two primary affordances per `16_UI_BIBLE.md`
@@ -32,9 +38,12 @@ import com.trashmuppet.pixelbeat.core.ui.TapTarget
 @Composable
 fun HomeScreen(
     recent: List<MBeatProject> = emptyList(),
+    scenePacks: List<ScenePack> = emptyList(),
+    isPro: Boolean = false,
     onNewProject: () -> Unit,
     onOpenProject: () -> Unit,
-    onProjectSelected: (MBeatProject) -> Unit = {}
+    onProjectSelected: (MBeatProject) -> Unit = {},
+    onUnlockPro: () -> Unit = {}
 ) {
     val haptic = LocalHapticFeedback.current
     Column(
@@ -88,6 +97,35 @@ fun HomeScreen(
                 onLongPress = { /* delete later */ }
             )
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("Scene Packs", color = MonoPalette.Foreground, fontSize = 14.sp)
+
+        scenePacks.forEach { pack ->
+            ProGate(
+                requiresPro = pack.requiresPro,
+                isPro = isPro,
+                onUnlockClick = onUnlockPro,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .sizeIn(minHeight = TapTarget)
+                        .border(width = 1.dp, color = MonoPalette.Foreground)
+                        .background(MonoPalette.Background)
+                        .padding(16.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(pack.displayName, color = MonoPalette.Foreground)
+                        Text(pack.description, color = MonoPalette.Foreground, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Keep the export progress bar import path live so
         // children of HomeScreen never silently drop the symbol.

@@ -33,7 +33,8 @@ import kotlin.coroutines.resume
  * No subscriptions, no accounts, no telemetry.
  */
 class GooglePlayPremiumManager(
-    private val context: Context
+    private val context: Context,
+    private val debugBypass: Boolean = false
 ) : PremiumManager, PurchasesUpdatedListener {
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -41,14 +42,21 @@ class GooglePlayPremiumManager(
     private val _entitlementState = MutableStateFlow<PremiumState>(readCache())
     override val entitlementState: StateFlow<PremiumState> = _entitlementState.asStateFlow()
 
-    private val billingClient: BillingClient = BillingClient.newBuilder(context)
-        .setListener(this)
-        .enablePendingPurchases()
-        .build()
+    private val billingClient: BillingClient = if (debugBypass) {
+        // Bypass: no real billing client needed in debug.
+        @Suppress("UNUSED_ANONYMOUS_PARAMETER")
+        BillingClient.newBuilder(context).setListener(this).build()
+    } else {
+        BillingClient.newBuilder(context).setListener(this).enablePendingPurchases().build()
+    }
 
     private var productDetails: ProductDetails? = null
 
     override suspend fun refreshEntitlement() {
+        if (debugBypass) {
+            _entitlementState.value = PremiumState.Pro
+            return
+        }
         if (_entitlementState.value !is PremiumState.Pro) {
             _entitlementState.value = PremiumState.Pending
         }
@@ -68,6 +76,7 @@ class GooglePlayPremiumManager(
     }
 
     override suspend fun launchPurchaseFlow(activity: Any) {
+        if (debugBypass) return
         require(activity is Activity) { "Expected an Android Activity, got ${activity::class.simpleName}" }
 
         // Ensure billing client is connected before launching the flow.
@@ -158,6 +167,7 @@ class GooglePlayPremiumManager(
     // ------------------------------------------------------------------
 
     private fun readCache(): PremiumState {
+        if (debugBypass) return PremiumState.Pro
         val state = prefs.getString(KEY_STATE, "FREE") ?: "FREE"
         return if (state == "PRO") PremiumState.Pro else PremiumState.Free
     }
